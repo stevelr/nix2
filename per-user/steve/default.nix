@@ -45,6 +45,7 @@ in {
     nmap
     rclone
     restic
+    rsync
     socat
     starship
   ];
