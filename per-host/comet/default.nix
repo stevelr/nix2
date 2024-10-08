@@ -17,7 +17,12 @@ in {
   # before changing: `darwin-rebuild changelog`.
   system.stateVersion = 4;
 
-  #nixpkgs.hostPlatform = "aarch64-darwin";
+  users.users.steve = {
+    name = "steve";
+    home = "/Users/steve";
+  };
+
+  nixpkgs.hostPlatform = "aarch64-darwin";
   networking.hostName = hostname;
 
   environment.systemPackages =

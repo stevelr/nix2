@@ -36,9 +36,17 @@ in {
     taplo
 
     # misc
-    starship
-    gocryptfs
+    age
+    bind.dnsutils
     aria2
+    gnused
+    gocryptfs
+    nix-output-monitor
+    nmap
+    rclone
+    restic
+    socat
+    starship
   ];
 
   # directories to add to PATH
@@ -90,6 +98,9 @@ in {
       TERM = "xterm-256color";
     };
     shellAliases = {
+      gd = "git diff";
+      gst = "git status";
+      gpu = "git push -u origin";
       h = "hostname";
       j = "just";
       jwt-decode = "step crypto jwt inspect --insecure";

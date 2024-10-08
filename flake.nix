@@ -2,13 +2,18 @@
   description = "Common NixOS config";
 
   inputs = {
-    # nixos-24.05 branch
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-24.05";
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
 
     # You can access packages and modules from different nixpkgs revs
-    # at the same time. Here's an working example:
+    # at the same time.
+    # If nixpkgs is stable, "pkgs.unstable" is added as an overlay, to make both available.
     nixpkgs-unstable.url = "github:nixos/nixpkgs/nixos-unstable";
     # Also see the 'unstable-packages' overlay at 'overlays/default.nix'.
+
+    nix-darwin = {
+      url = "github:LnL7/nix-darwin";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
 
     flake-checker = {
       url = "https://flakehub.com/f/DeterminateSystems/flake-checker/*";
@@ -30,6 +35,10 @@
         "x86_64-linux"
         "aarch64-darwin"
         #"x86_64-darwin"
+      ];
+
+      commonModules = [
+        ./modules/common.nix
       ];
 
       forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
@@ -92,31 +101,27 @@
       darwinConfigurations = let
         home-manager = inputs.home-manager.darwinModules.home-manager;
       in {
-        comet = nix-darwin.lib.darwinSystem {
+        comet = inputs.nix-darwin.lib.darwinSystem {
           specialArgs = {
             hostname = "comet";
           };
-          modules = [
-            ({...}: {
-              nixpkgs.hostPlatform = "aarch64-darwin";
-              users.users.steve = {
-                name = "steve";
-                home = "/Users/steve";
-              };
-            })
-            ./configuration.nix
-            home-manager
-            {
-              home-manager = {
-                extraSpecialArgs = {
-                  inherit (cfg) hostname username;
+          modules =
+            [
+              ./per-host/comet
+              home-manager
+              {
+                home-manager = {
+                  extraSpecialArgs = {
+                    hostname = "comet";
+                    username = "steve";
+                  };
+                  useGlobalPkgs = true;
+                  useUserPackages = true;
+                  users."steve" = import ./per-user/steve;
                 };
-                useGlobalPkgs = true;
-                useUserPackages = true;
-                users.${cfg.username} = import ./home.nix;
-              };
-            }
-          ];
+              }
+            ]
+            ++ commonModules;
         };
       };
 
@@ -128,32 +133,36 @@
         pangea = mkSystem {
           system = "x86_64-linux";
           hostname = "pangea";
-          modules = [
-            ./per-host/pangea
-          ];
+          modules =
+            [
+              ./per-host/pangea
+            ]
+            ++ commonModules;
         };
 
         aster = mkSystem {
           system = "aarch64-linux";
           hostname = "aster";
-          modules = [
-            ./per-host/aster/configuration.nix
-            home-manager
-            {
-              home-manager = {
-                extraSpecialArgs = {
-                  hostname = "aster";
+          modules =
+            [
+              ./per-host/aster/configuration.nix
+              home-manager
+              {
+                home-manager = {
+                  extraSpecialArgs = {
+                    hostname = "aster";
+                  };
+                  useGlobalPkgs = true;
+                  useUserPackages = true;
+                  backupFileExtension = "backup";
+                  users.steve = import ./per-user/steve;
                 };
-                useGlobalPkgs = true;
-                useUserPackages = true;
-                backupFileExtension = "backup";
-                users.steve = import ./per-user/steve;
-              };
 
-              # Optionally, use home-manager.extraSpecialArgs to pass
-              # arguments to home.nix
-            }
-          ];
+                # Optionally, use home-manager.extraSpecialArgs to pass
+                # arguments to home.nix
+              }
+            ]
+            ++ commonModules;
         };
       };
     };
