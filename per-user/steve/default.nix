@@ -1,6 +1,8 @@
-{pkgs, ...}: let
-  username = "steve";
-in {
+{
+  pkgs,
+  username,
+  ...
+}: {
   imports = [
     ./git.nix
     ./helix.nix

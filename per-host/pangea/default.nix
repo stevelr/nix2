@@ -101,7 +101,7 @@ in {
       ## Internal bridges
       ##
 
-      "pangea-br0" = {
+      "container-br0" = {
         name = "br0";
         gateway = "10.144.0.1";
         dhcp.enable = true;
@@ -135,22 +135,22 @@ in {
     my.pre.containers = {
       "empty" = {
         name = "empty";
-        bridge = "pangea-br0";
+        bridge = "container-br0";
         # address is assigned by dhcp
       };
       "empty-static" = {
         name = "empty-static";
-        bridge = "pangea-br0";
+        bridge = "container-br0";
         address = "10.144.0.222";
       };
       "nginx" = {
         name = "nginx";
-        bridge = "pangea-br0";
+        bridge = "container-br0";
         address = "10.144.0.15";
       };
       "gitea" = {
         name = "gitea";
-        bridge = "pangea-br0";
+        bridge = "container-br0";
         address = "10.144.0.16";
         proxyPort = 3000;
         # http listen port
@@ -162,7 +162,7 @@ in {
       };
       "vault" = {
         name = "vault";
-        bridge = "pangea-br0";
+        bridge = "container-br0";
         address = "10.144.0.17";
         proxyPort = config.my.ports.vault.port;
         settings = {
@@ -182,7 +182,7 @@ in {
       };
       "seafile" = {
         name = "seafile";
-        bridge = "pangea-br0";
+        bridge = "container-br0";
         address = "10.144.0.18";
         proxyPort = 8888;
         settings = {
@@ -192,23 +192,23 @@ in {
       };
       "grafana" = {
         name = "grafana";
-        bridge = "pangea-br0";
+        bridge = "container-br0";
         address = "10.144.0.19";
         proxyPort = 8080;
       };
       "nettest" = {
         name = "nettest";
-        bridge = "pangea-br0";
+        bridge = "container-br0";
         address = "10.144.0.20";
       };
       "pmail" = {
         name = "pmail";
-        bridge = "pangea-br0";
+        bridge = "container-br0";
         address = "10.144.0.21";
       };
       "clickhouse" = {
         name = "clickhouse";
-        bridge = "pangea-br0";
+        bridge = "container-br0";
         address = "10.144.0.22";
         settings = {
           httpPort = config.my.ports.clickhouseHttp.port;
@@ -217,7 +217,7 @@ in {
       };
       "vector" = {
         name = "vector";
-        bridge = "pangea-br0";
+        bridge = "container-br0";
         address = "10.144.0.23";
         settings = {
           apiPort = config.my.ports.vector.port;

@@ -1,7 +1,6 @@
-{ config, ... }:
-let
-  collectorIp = "10.144.0.1";
-  keaCtrlCfg = config.my.service.kea.control-agent;
+{config, ...}: let
+  collectorIp = config.my.subnets."container-br0".gateway;
+  #keaCtrlCfg = config.my.service.kea.control-agent;
 
   mkExporter = name: {
     enable = true;
@@ -10,17 +9,18 @@ let
     port = config.my.ports.${name}.port;
     listenAddress = collectorIp;
   };
-in
-{
+in {
   services.prometheus = {
     enable = true;
     exporters = {
-      node = (mkExporter "node") // {
-        enabledCollectors = [
-          "logind"
-          "systemd"
-        ];
-      };
+      node =
+        (mkExporter "node")
+        // {
+          enabledCollectors = [
+            "logind"
+            "systemd"
+          ];
+        };
       # kea = (mkExporter "kea") // {
       #   enable = keaCtrlCfg.enable;
       #   targets = [ "http://127.0.0.1:${toString keaCtrlCfg.port}" ];

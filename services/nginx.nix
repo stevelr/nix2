@@ -1,56 +1,65 @@
 # nginx.nix
-{ config, pkgs, ... }:
-let
+{
+  config,
+  pkgs,
+  lib,
+  ...
+}: let
   inherit (builtins) concatStringsSep;
   inherit (pkgs) myLib;
   inherit (config.my.containers) nginx gitea vault seafile;
   name = "nginx";
 
+  cfg = myLib.configIf config.my.containers "nginx";
   bridgeCfg = config.my.subnets.${nginx.bridge};
   mkUsers = myLib.mkUsers config.my.userids;
   mkGroups = myLib.mkGroups config.my.userids;
-in
-{
-  containers.${name} = {
+in {
+  containers = lib.optionalAttrs cfg.enable {
+    nginx = {
+      autoStart = true;
+      privateNetwork = true;
+      hostBridge = bridgeCfg.name;
+      localAddress = "${nginx.address}/${toString bridgeCfg.prefixLen}";
 
-    autoStart = true;
-    privateNetwork = true;
-    hostBridge = bridgeCfg.name;
-    localAddress = "${nginx.address}/${toString bridgeCfg.prefixLen}";
+      forwardPorts =
+        builtins.map (port: {
+          hostPort = port;
+          containerPort = port;
+        }) [
+          80
+          443
+          #vault.settings.clusterPort
+        ];
 
-    forwardPorts = builtins.map (port: { hostPort = port; containerPort = port; }) [
-      80
-      443
-      #vault.settings.clusterPort
-    ];
+      # all bindings default to read-only
+      # static html
+      bindMounts."/var/local/www" = {hostPath = "/var/local/www/pangea";};
+      # tls certs
+      bindMounts."/etc/ssl/nginx/gitea.pasilla.net" = {hostPath = "/root/certs/gitea.pasilla.net";};
+      bindMounts."/etc/ssl/nginx/vault.pasilla.net" = {hostPath = "/root/certs/vault.pasilla.net";};
+      bindMounts."/etc/ssl/nginx/seafile.pasilla.net" = {hostPath = "/root/certs/seafile.pasilla.net";};
+      bindMounts."/etc/ssl/nginx/pangea.pasilla.net" = {hostPath = "/root/certs/pangea.pasilla.net";};
 
-    # all bindings default to read-only
-    # static html
-    bindMounts."/var/local/www" = { hostPath = "/var/local/www/pangea"; };
-    # tls certs
-    bindMounts."/etc/ssl/nginx/gitea.pasilla.net" = { hostPath = "/root/certs/gitea.pasilla.net"; };
-    bindMounts."/etc/ssl/nginx/vault.pasilla.net" = { hostPath = "/root/certs/vault.pasilla.net"; };
-    bindMounts."/etc/ssl/nginx/seafile.pasilla.net" = { hostPath = "/root/certs/seafile.pasilla.net"; };
-    bindMounts."/etc/ssl/nginx/pangea.pasilla.net" = { hostPath = "/root/certs/pangea.pasilla.net"; };
+      config = {
+        environment.systemPackages = with pkgs; [
+          curl
+          helix
+          iproute2
+          lsof # for debugging
+          vim
+        ];
 
-    config = {
-      environment.systemPackages = with pkgs; [
-        curl
-        helix
-        iproute2
-        lsof # for debugging
-        vim
-      ];
+        networking =
+          myLib.netDefaults nginx bridgeCfg
+          // {
+            firewall.allowedTCPPorts = [80 443 vault.settings.clusterPort];
+          };
 
-      networking = myLib.netDefaults nginx bridgeCfg // {
-        firewall.allowedTCPPorts = [ 80 443 vault.settings.clusterPort ];
-      };
+        users.users = mkUsers ["nginx"];
+        users.groups = mkGroups ["nginx"];
 
-      users.users = (mkUsers [ "nginx" ]);
-      users.groups = (mkGroups [ "nginx" ]);
-
-      services.nginx =
-        let
+        services.nginx = let
           perServerConfig = {
             gitea = ''
               client_max_body_size 24m;
@@ -84,40 +93,38 @@ in
           };
 
           # allow larger requests for seafile
-          serverStanza = serverCfg:
-            ''
-              server {
-                listen                    80;
-                server_name               ${serverCfg.name}.pasilla.net;
-                return                    301  https://$host$request_uri;
+          serverStanza = serverCfg: ''
+            server {
+              listen                    80;
+              server_name               ${serverCfg.name}.pasilla.net;
+              return                    301  https://$host$request_uri;
+            }
+            server {
+              listen                    443 ssl;
+              http2                     on;
+              server_name               ${serverCfg.name}.pasilla.net;
+              ssl_certificate           /etc/ssl/nginx/${serverCfg.name}.pasilla.net/fullchain1.pem;
+              ssl_certificate_key       /etc/ssl/nginx/${serverCfg.name}.pasilla.net/privkey1.pem;
+              ssl_trusted_certificate   /etc/ssl/nginx/${serverCfg.name}.pasilla.net/chain1.pem;
+              ssl_protocols             TLSv1.2 TLSv1.3;
+              ssl_session_timeout       10m;
+              ssl_session_tickets       off;
+              ssl_prefer_server_ciphers on;
+              #ssl_ecdh_curve            X25519:prime256v1:secp384r1:secp521r1;
+              ${perServerConfig.${serverCfg.name}}
+              location / {
+                proxy_pass              http://${serverCfg.address}:${toString serverCfg.proxyPort};
+                proxy_set_header        Host $server_name;   # was $host
+                # see if this helps: rewrite http redirects from backend server to https
+                # proxy_redirect        http:// https://;
               }
-              server {
-                listen                    443 ssl;
-                http2                     on;
-                server_name               ${serverCfg.name}.pasilla.net;
-                ssl_certificate           /etc/ssl/nginx/${serverCfg.name}.pasilla.net/fullchain1.pem;
-                ssl_certificate_key       /etc/ssl/nginx/${serverCfg.name}.pasilla.net/privkey1.pem;
-                ssl_trusted_certificate   /etc/ssl/nginx/${serverCfg.name}.pasilla.net/chain1.pem;
-                ssl_protocols             TLSv1.2 TLSv1.3;
-                ssl_session_timeout       10m;
-                ssl_session_tickets       off;
-                ssl_prefer_server_ciphers on;
-                #ssl_ecdh_curve            X25519:prime256v1:secp384r1:secp521r1;
-                ${perServerConfig.${serverCfg.name}}
-                location / {
-                  proxy_pass              http://${serverCfg.address}:${toString serverCfg.proxyPort};
-                  proxy_set_header        Host $server_name;   # was $host
-                  # see if this helps: rewrite http redirects from backend server to https
-                  # proxy_redirect        http:// https://;
-                }
-              }
-            '';
-        in
-        {
+            }
+          '';
+        in {
           enable = true;
           user = "nginx";
           group = "nginx";
-          statusPage = true;  # enable status page on 127.0.0.1/nginx_status and on virtual hosts
+          statusPage = true; # enable status page on 127.0.0.1/nginx_status and on virtual hosts
           validateConfigFile = true;
           recommendedGzipSettings = true;
           recommendedOptimisation = true;
@@ -141,51 +148,50 @@ in
             log_format seafileformat '$http_x_forwarded_for $remote_addr [$time_local] "$request" $status $body_bytes_sent "$http_referer" "$http_user_agent" $upstream_response_time';
           '';
 
-          virtualHosts."pangea.pasilla.net" =
-            let
-              grafanaCfg = config.my.containers.grafana;
-              domain = "pangea.pasilla.net";
-            in
-            {
-              default = true;
-              addSSL = true;
-              http2 = true;
-              serverAliases = [
-                "pangea"
-                "pasilla.net"
-              ];
-              sslCertificate = "/etc/ssl/nginx/${domain}/fullchain1.pem";
-              sslCertificateKey = "/etc/ssl/nginx/${domain}/privkey1.pem";
-              sslTrustedCertificate = "/etc/ssl/nginx/${domain}/chain1.pem";
-              locations."/._status" = {
-                extraConfig = ''
-                  stub_status on;
-                  allow 0.0.0.0;
-                '';
-              };
-              locations."/grafana/" = {
-                proxyPass = "http://${toString grafanaCfg.address}:${toString grafanaCfg.proxyPort}";
-                proxyWebsockets = true;
-                #recommendedProxySettings = true;
-              };
-
-              # static site
-              locations."/" = {
-                extraConfig = ''
-                  autoindex off;
-                  root /var/local/www;
-                '';
-              };
+          virtualHosts."pangea.pasilla.net" = let
+            grafanaCfg = config.my.containers.grafana;
+            domain = "pangea.pasilla.net";
+          in {
+            default = true;
+            addSSL = true;
+            http2 = true;
+            serverAliases = [
+              "pangea"
+              "pasilla.net"
+            ];
+            sslCertificate = "/etc/ssl/nginx/${domain}/fullchain1.pem";
+            sslCertificateKey = "/etc/ssl/nginx/${domain}/privkey1.pem";
+            sslTrustedCertificate = "/etc/ssl/nginx/${domain}/chain1.pem";
+            locations."/._status" = {
+              extraConfig = ''
+                stub_status on;
+                allow 0.0.0.0;
+              '';
+            };
+            locations."/grafana/" = {
+              proxyPass = "http://${toString grafanaCfg.address}:${toString grafanaCfg.proxyPort}";
+              proxyWebsockets = true;
+              #recommendedProxySettings = true;
             };
 
-          appendHttpConfig = concatStringsSep "\n"
-            (map (c: serverStanza c) [ gitea vault seafile ]);
+            # static site
+            locations."/" = {
+              extraConfig = ''
+                autoindex off;
+                root /var/local/www;
+              '';
+            };
+          };
 
+          appendHttpConfig =
+            concatStringsSep "\n"
+            (map (c: serverStanza c) [gitea vault seafile]);
         };
 
-      services.resolved.enable = false;
-      environment.variables.TZ = config.my.containerCommon.timezone;
-      system.stateVersion = config.my.containerCommon.stateVersion;
-    }; # config
-  }; # container nginx
+        services.resolved.enable = false;
+        environment.variables.TZ = config.my.containerCommon.timezone;
+        system.stateVersion = config.my.containerCommon.stateVersion;
+      }; # config
+    }; # container nginx
+  };
 }

@@ -56,7 +56,7 @@
       }:
         nixpkgs.lib.nixosSystem {
           inherit system;
-          specialArgs = {inherit inputs;};
+          #specialArgs = {pkgs = nixpkgs;};
           modules =
             [
               # import the overlays module
@@ -151,6 +151,7 @@
                 home-manager = {
                   extraSpecialArgs = {
                     hostname = "aster";
+                    username = "steve";
                   };
                   useGlobalPkgs = true;
                   useUserPackages = true;

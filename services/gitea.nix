@@ -1,15 +1,18 @@
 # gitea.nix
-{ config, pkgs, ... }:
-let
-  name = "gitea";
-  cfg = config.my.containers.${name};
-  bridgeCfg = config.my.subnets.${cfg.bridge};
+{
+  config,
+  pkgs,
+  lib,
+  ...
+}: let
   inherit (pkgs) myLib;
+  name = "gitea";
+  bridgeCfg = config.my.subnets.${cfg.bridge};
+  cfg = myLib.configIf config.my.containers name;
   mkUsers = myLib.mkUsers config.my.userids;
   mkGroups = myLib.mkGroups config.my.userids;
-in
-{
-  containers.${name} = {
+in {
+  containers.${name} = lib.optionalAttrs cfg.enable {
     autoStart = true;
     bindMounts = {
       "/var/lib/db/pg-gitea1" = {
@@ -24,14 +27,16 @@ in
     privateNetwork = true;
     hostBridge = bridgeCfg.name;
     localAddress = "${cfg.address}/${toString bridgeCfg.prefixLen}";
-    forwardPorts = [{
-      hostPort = cfg.settings.hostSsh;
-      containerPort = cfg.settings.ssh;
-    }];
+    forwardPorts = [
+      {
+        hostPort = cfg.settings.hostSsh;
+        containerPort = cfg.settings.ssh;
+      }
+    ];
 
     config = {
-      users.users = (mkUsers [ "gitea" "postgres" ]);
-      users.groups = (mkGroups [ "gitea" "postgres" ]);
+      users.users = mkUsers ["gitea" "postgres"];
+      users.groups = mkGroups ["gitea" "postgres"];
 
       # debug logging for network
       systemd.services."systemd-networkd".environment.SYSTEMD_LOG_LEVEL = "debug";
@@ -43,9 +48,9 @@ in
         jq
         nmap
         vim
-      ] ++ (import ../nixos/handy-tools.nix { inherit pkgs; }).tools;
+      ];
 
-      services.openssh.enable = true;
+      #services.openssh.enable = true;
 
       services.postgresql = {
         enable = true;
@@ -53,7 +58,7 @@ in
         package = pkgs.postgresql_16;
         settings.port = 5432;
         dataDir = "/var/lib/db/pg-gitea1";
-        initdbArgs = [ "--no-locale" "-E=UTF8" "-n" "-N" ];
+        initdbArgs = ["--no-locale" "-E=UTF8" "-n" "-N"];
         #ensureDatabases = [ "gitea" ];
         ensureUsers = [
           {
@@ -64,7 +69,7 @@ in
       };
 
       # all these storage locations are configurable. Currently all subdirs of stateDir /var/lib/gitea
-      # repositoryRoot   /var/lib/gitea/repositories 
+      # repositoryRoot   /var/lib/gitea/repositories
       # static files in  /var/lib/gitea/data
       # log files in     /var/lib/gitea/log
       # custom (config & templates) in /var/lib/gitea/custom
@@ -93,10 +98,12 @@ in
         };
       };
 
-      networking = myLib.netDefaults cfg bridgeCfg // {
-        firewall.enable = true;
-        firewall.allowedTCPPorts = [ cfg.proxyPort cfg.settings.ssh ];
-      };
+      networking =
+        myLib.netDefaults cfg bridgeCfg
+        // {
+          firewall.enable = true;
+          firewall.allowedTCPPorts = [cfg.proxyPort cfg.settings.ssh];
+        };
 
       # force br0 nameserver
       services.resolved.enable = false;

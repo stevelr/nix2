@@ -1,24 +1,30 @@
-{ config, inputs, pkgs, lib, hostname, ... }:
-let
+{
+  config,
+  inputs,
+  pkgs,
+  lib,
+  hostname,
+  ...
+}: let
   inherit (builtins) attrNames listToAttrs isNull;
   inherit (lib) mkOption mkEnableOption types;
   inherit (lib.attrsets) filterAttrs;
-in
-
-let
+in let
   # Choose for the particular host machine.
   hostDomain = "pasilla.net";
 
-  valueOr = expr: other: if (! isNull expr) then expr else other;
+  valueOr = expr: other:
+    if (! isNull expr)
+    then expr
+    else other;
 
   # extract first part of ip addr  "10.11.12.13" -> "10.11.12"
   first24 = addr: builtins.head (builtins.head (builtins.tail (builtins.split "([0-9]+\.[0-9]+\.[0-9]+)\.[0-9]+" addr)));
-  defaultPool = addr:
-    let prefix = first24 addr; in
-    "${prefix}.100-${prefix}.199";
+  defaultPool = addr: let
+    prefix = first24 addr;
+  in "${prefix}.100-${prefix}.199";
 
   containerOptions = {
-
     enable = mkOption {
       type = types.bool;
       example = false;
@@ -42,7 +48,7 @@ let
       example = "10.100.0.43";
       default = null;
       description = ''
-        Static ip of container on subnet. 
+        Static ip of container on subnet.
         Do not use CIDR format: prefix will be obtained from the bridge's prefixLen.
         If the bridge has dhcp enabled, address can be null to use dhcp-assigned address.
       '';
@@ -64,17 +70,17 @@ let
       '';
     };
 
-    addressCIDR = mkOption {
-      type = types.nullOr types.str;
-      example = "10.10.10.82/24";
-      default = null;
-      description = "address in CIDR form. Defaults to <address>/<prefixLen>";
-    };
+    # addressCIDR = mkOption {
+    #   type = types.nullOr types.str;
+    #   example = "10.10.10.82/24";
+    #   default = null;
+    #   description = "address in CIDR form. Defaults to <address>/<prefixLen>";
+    # };
 
     settings = mkOption {
       type = types.attrsOf types.anything;
       description = "other settings";
-      default = { };
+      default = {};
     };
 
     proxyPort = mkOption {
@@ -86,26 +92,24 @@ let
     };
   };
 
-  # fill in defaults from containerOptions
-  makeContainer = c: {
-    bridge = c.bridge;
-    address = c.address;
-    name = c.name;
-    prefixLen = c.prefixLen;
-    addressCIDR =
-      if (! isNull c.address) && (isNull c.addressCIDR)
-      then
-        "${c.address}/${toString c.prefixLen}"
-      else
-        c.addressCIDR;
-    proxyPort = c.proxyPort;
-    settings = c.settings;
-    enable = c.enable;
-  };
-
+  # # fill in defaults from containerOptions
+  # makeContainer = c: {
+  #   bridge = c.bridge;
+  #   address = c.address;
+  #   name = c.name;
+  #   prefixLen = c.prefixLen;
+  #   addressCIDR =
+  #     if (! isNull c.address) && (isNull c.addressCIDR)
+  #     then
+  #       "${c.address}/${toString c.prefixLen}"
+  #     else
+  #       c.addressCIDR;
+  #   proxyPort = c.proxyPort;
+  #   settings = c.settings;
+  #   enable = c.enable;
+  # };
 
   netOptions = {
-
     name = mkOption {
       type = types.str;
       example = "br0";
@@ -179,7 +183,7 @@ let
 
     dnsServers = mkOption {
       type = types.nullOr (types.listOf types.str);
-      example = [ "10.100.0.1" "9.9.9.9" ];
+      example = ["10.100.0.1" "9.9.9.9"];
       default = null;
       description = ''
         DNS servers to set with dhcp. Only used if dhcp.enable is true.
@@ -233,12 +237,12 @@ let
                 };
               };
             });
-            default = [ ];
+            default = [];
             description = "mapping from mac address to IP within the subnet";
           };
         };
       });
-      default = { enable = false; };
+      default = {enable = false;};
       example = {
         enable = true;
         pool = "10.0.0.100-10.0.0.199";
@@ -250,36 +254,42 @@ let
     settings = mkOption {
       type = types.attrsOf types.anything;
       description = "other settings";
-      default = { };
+      default = {};
     };
   };
 
-  makeNet = n:
-    let
-      dns = valueOr n.dns n.gateway;
-      hasDhcp = (! isNull n.dhcp) && n.dhcp.enable;
-    in
-    {
-      name = n.name;
-      localDev = n.localDev;
-      gateway = n.gateway;
-      prefixLen = n.prefixLen;
-      macAddress = n.macAddress;
-      address = valueOr n.address n.gateway;
-      net = valueOr n.net "${first24 n.gateway}.0/${toString n.prefixLen}";
-      inherit dns;
-      dnsServers = valueOr n.dnsServers [ dns ];
-      domain = valueOr n.domain "${n.name}.${config.my.localDomain}";
-      settings = n.settings;
-      dhcp = {
-        enable = hasDhcp;
-        pool = if hasDhcp && (! isNull n.dhcp.pool) then n.dhcp.pool else defaultPool n.gateway;
-        id = if hasDhcp && n.dhcp.id == -1 then (pkgs.myLib.nethash n) else n.dhcp.id;
-        reservations = if hasDhcp then n.dhcp.reservations else [ ];
-      };
+  makeNet = n: let
+    dns = valueOr n.dns n.gateway;
+    hasDhcp = (! isNull n.dhcp) && n.dhcp.enable;
+  in {
+    name = n.name;
+    localDev = n.localDev;
+    gateway = n.gateway;
+    prefixLen = n.prefixLen;
+    macAddress = n.macAddress;
+    address = valueOr n.address n.gateway;
+    net = valueOr n.net "${first24 n.gateway}.0/${toString n.prefixLen}";
+    inherit dns;
+    dnsServers = valueOr n.dnsServers [dns];
+    domain = valueOr n.domain "${n.name}.${config.my.localDomain}";
+    settings = n.settings;
+    dhcp = {
+      enable = hasDhcp;
+      pool =
+        if hasDhcp && (! isNull n.dhcp.pool)
+        then n.dhcp.pool
+        else defaultPool n.gateway;
+      id =
+        if hasDhcp && n.dhcp.id == -1
+        then (pkgs.myLib.nethash n)
+        else n.dhcp.id;
+      reservations =
+        if hasDhcp
+        then n.dhcp.reservations
+        else [];
     };
-in
-{
+  };
+in {
   imports = [
     (../per-host + "/${hostname}")
     ../services
@@ -291,9 +301,7 @@ in
   ];
 
   options = {
-
     my = {
-
       hostName = mkOption {
         type = types.str;
         description = "system hostname";
@@ -349,7 +357,7 @@ in
             };
           };
         });
-        default = { };
+        default = {};
       };
 
       userids = mkOption {
@@ -376,9 +384,8 @@ in
           };
         });
         description = "uid and gid settings for common users";
-        default = { };
+        default = {};
       };
-
 
       # initial data to be post-processed
       pre = {
@@ -386,7 +393,7 @@ in
           type = types.attrsOf (types.submodule {
             options = netOptions;
           });
-          default = { };
+          default = {};
           description = "bridge networks connecting containers";
         };
 
@@ -395,14 +402,14 @@ in
           type = types.attrsOf (types.submodule {
             options = containerOptions;
           });
-          default = { };
+          default = {};
         };
 
         hostNets = mkOption {
           type = types.attrsOf (types.submodule {
             options = netOptions;
           });
-          default = { };
+          default = {};
           description = "host interfaces";
         };
       };
@@ -411,7 +418,7 @@ in
         type = types.attrsOf (types.submodule {
           options = netOptions;
         });
-        default = { };
+        default = {};
         description = "bridge networks connecting containers";
       };
 
@@ -419,7 +426,7 @@ in
         type = types.attrsOf (types.submodule {
           options = containerOptions;
         });
-        default = { };
+        default = {};
         description = "configurations for containers";
       };
 
@@ -427,7 +434,7 @@ in
         type = types.attrsOf (types.submodule {
           options = netOptions;
         });
-        default = { };
+        default = {};
         description = "host interfaces";
       };
 
@@ -435,7 +442,7 @@ in
         type = types.listOf (types.submodule {
           options = netOptions;
         });
-        default = { };
+        default = {};
         description = ''
           (calculated value) list of virtual bridge nets on host where will run dns and dhcp servers
         '';
@@ -470,10 +477,9 @@ in
                     default = config.my.ports.tailscale.port;
                     description = "port to listen on for tunnel traffic";
                   };
-
                 };
               };
-              default = { enable = false; };
+              default = {enable = false;};
               description = "tailscale client daemon options";
             };
 
@@ -523,7 +529,7 @@ in
     my.containerCommon.stateVersion = "24.05";
     my.containerCommon.timezone = "Etc/UTC";
 
-    # fixup missing values 
+    # fixup missing values
     my.subnets = builtins.mapAttrs (_: n: (makeNet n)) config.my.pre.subnets;
     my.containers = builtins.mapAttrs (_: c: (makeContainer c)) config.my.pre.containers;
     my.hostNets = builtins.mapAttrs (_: n: (makeNet n)) config.my.pre.hostNets;
@@ -533,52 +539,107 @@ in
     # consistent id numbering for file mounts
     my.userids = {
       # interactive users
-      steve = { uid = 1000; gid = 100; isInteractive = true; };
-      user = { uid = 1001; gid = 100; isInteractive = true; };
+      steve = {
+        uid = 1000;
+        gid = 100;
+        isInteractive = true;
+      };
+      user = {
+        uid = 1001;
+        gid = 100;
+        isInteractive = true;
+      };
 
       # services
-      seafile = { uid = 4001; gid = 4001; };
-      pmail = { uid = 4002; gid = 4002; };
-      unbound = { uid = 4003; gid = 4003; };
-      vault = { uid = 4004; gid = 4004; };
-      gitea = { uid = 4005; gid = 4005; };
-      postgres = { uid = 4006; gid = 4006; };
-      nginx = { uid = 4007; gid = 4007; };
+      seafile = {
+        uid = 4001;
+        gid = 4001;
+      };
+      pmail = {
+        uid = 4002;
+        gid = 4002;
+      };
+      unbound = {
+        uid = 4003;
+        gid = 4003;
+      };
+      vault = {
+        uid = 4004;
+        gid = 4004;
+      };
+      gitea = {
+        uid = 4005;
+        gid = 4005;
+      };
+      postgres = {
+        uid = 4006;
+        gid = 4006;
+      };
+      nginx = {
+        uid = 4007;
+        gid = 4007;
+      };
 
-      grafana = { uid = 4010; gid = 4010; };
-      prometheus = { uid = 4011; gid = 4011; };
-      loki = { uid = 4012; gid = 4012; };
-      tempo = { uid = 4013; gid = 4013; };
-      nats = { uid = 4014; gid = 4014; };
-      clickhouse = { uid = 4015; gid = 4015; };
-      vector = { uid = 4016; gid = 4016; };
+      grafana = {
+        uid = 4010;
+        gid = 4010;
+      };
+      prometheus = {
+        uid = 4011;
+        gid = 4011;
+      };
+      loki = {
+        uid = 4012;
+        gid = 4012;
+      };
+      tempo = {
+        uid = 4013;
+        gid = 4013;
+      };
+      nats = {
+        uid = 4014;
+        gid = 4014;
+      };
+      clickhouse = {
+        uid = 4015;
+        gid = 4015;
+      };
+      vector = {
+        uid = 4016;
+        gid = 4016;
+      };
       #exporter = { uid = 4017; gid = 4017; }; # generic for node exporters
 
       # developer group
-      developer = { gid = 4500; };
+      developer = {gid = 4500;};
       # prometheus exporters
-      exporters = { gid = 4501; };
+      exporters = {gid = 4501;};
     };
 
     my.ports = {
-      clickhouseHttp = { port = 8123; };
-      clickhouseTcp = { port = 9000; };
-      incus = { port = 10200; };
-      kea = { port = 14461; };
-      nats = { port = 4222; };
-      node = { port = 9100; description = "node exporter"; };
-      ssh = { port = 22; };
-      tailscale = { port = 41641; }; # config.my.service.tailscale.port; 
-      unbound = { port = 53; };
-      vault = { port = 8200; description = "Hashicorp vault api port"; };
-      vector = { port = 8686; };
-      ##qryn = { port = 3100; }; 
+      clickhouseHttp = {port = 8123;};
+      clickhouseTcp = {port = 9000;};
+      incus = {port = 10200;};
+      kea = {port = 14461;};
+      nats = {port = 4222;};
+      node = {
+        port = 9100;
+        description = "node exporter";
+      };
+      ssh = {port = 22;};
+      tailscale = {port = 41641;}; # config.my.service.tailscale.port;
+      unbound = {port = 53;};
+      vault = {
+        port = 8200;
+        description = "Hashicorp vault api port";
+      };
+      vector = {port = 8686;};
+      ##qryn = { port = 3100; };
     };
-
 
     ##
     ## -----
-    ## 
+    ##
 
     # set host to same UTC timezone as containeres
     time.timeZone = config.my.containerCommon.timezone;
@@ -621,17 +682,30 @@ in
     # For each normal user, give it its own sub-directories under /mnt/scratch/home/ and
     # /var/tmp/home/.  This is especially useful for a user to place large dispensable things that
     # it wants to be excluded from backups.
-    systemd.tmpfiles.packages =
-      let
-        mkTmpfilesDirPkg = base:
-          (pkgs.myLib.tmpfiles.mkDirPkg'
-            { ${base} = { user = "root"; group = "root"; mode = "0755"; }; }
-            (listToAttrs (map
-              (userName:
-                { name = userName; value = { user = userName; group = "users"; mode = "0700"; }; })
-              (attrNames (filterAttrs (n: v: v.isNormalUser) config.users.users))))
-          ).pkg;
-      in
+    systemd.tmpfiles.packages = let
+      mkTmpfilesDirPkg = base:
+        (
+          pkgs.myLib.tmpfiles.mkDirPkg'
+          {
+            ${base} = {
+              user = "root";
+              group = "root";
+              mode = "0755";
+            };
+          }
+          (listToAttrs (map
+            (userName: {
+              name = userName;
+              value = {
+                user = userName;
+                group = "users";
+                mode = "0700";
+              };
+            })
+            (attrNames (filterAttrs (n: v: v.isNormalUser) config.users.users))))
+        )
+        .pkg;
+    in
       map mkTmpfilesDirPkg [
         "/var/tmp/home"
       ];
@@ -642,11 +716,20 @@ in
       extraRules = [
         # allow users in group wheel to run nixos-rebuild, with any args, without password
         {
-          groups = [ "wheel" ];
+          groups = ["wheel"];
           commands = with pkgs; [
-            { command = "${nixos-rebuild}/bin/nixos-rebuild"; options = [ "SETENV" "NOPASSWD" ]; }
-            { command = "${systemd}/bin/systemctl"; options = [ "SETENV" "NOPASSWD" ]; }
-            { command = "ALL"; options = [ "SETENV" ]; }
+            {
+              command = "${nixos-rebuild}/bin/nixos-rebuild";
+              options = ["SETENV" "NOPASSWD"];
+            }
+            {
+              command = "${systemd}/bin/systemctl";
+              options = ["SETENV" "NOPASSWD"];
+            }
+            {
+              command = "ALL";
+              options = ["SETENV"];
+            }
           ];
         }
         # allow all users in group wheel to execute any command, requiring password
@@ -673,7 +756,6 @@ in
     # started in user sessions, and so should be done here and not in
     # environment.systemPackages.
     programs = {
-
       ssh = {
         # Have `ssh-agent` be already available for users which want to use it.  No harm in
         # starting it for users which don't use it (as long as their apps & tools are not
@@ -688,16 +770,16 @@ in
       git = {
         enable = true;
         config = {
-          safe.directory =
-            let
-              safeDirs = [ "/etc/nixos" "/etc/nixos/users/dotfiles" ];
-              # Only needed because newer Git versions changed `safe.directory` handling to be more
-              # strict or something.  Unsure if the consequence of now needing this was
-              # unintentional of them.  If it was unintentional, I suppose it's possible that future
-              # Git versions could fix to no longer need this.
-              safeDirsWithExplicitGitDir = (map (d: d + "/.git") safeDirs)
-                ++ [ "/etc/nixos/.git/modules/users/dotfiles" ];
-            in
+          safe.directory = let
+            safeDirs = ["/etc/nixos" "/etc/nixos/users/dotfiles"];
+            # Only needed because newer Git versions changed `safe.directory` handling to be more
+            # strict or something.  Unsure if the consequence of now needing this was
+            # unintentional of them.  If it was unintentional, I suppose it's possible that future
+            # Git versions could fix to no longer need this.
+            safeDirsWithExplicitGitDir =
+              (map (d: d + "/.git") safeDirs)
+              ++ ["/etc/nixos/.git/modules/users/dotfiles"];
+          in
             safeDirs ++ safeDirsWithExplicitGitDir;
           transfer.credentialsInUrl = "die";
         };
@@ -728,50 +810,50 @@ in
 
     #environment.etc."nix/path/nixpkgs".source = inputs.nixpkgs;
 
-    environment.systemPackages = with pkgs; [
-      # git  # Installed via above programs.git.enable
-      alsa-lib
-      bind.dnsutils
-      clickhouse
-      cobalt # static site gen
-      zola # static site gen
-      fd
-      file
-      gnupg
-      helix
-      hello-custom # test overlays
-      htop
-      hydra-check
-      iotop
-      jq
-      just
-      lsb-release
-      man-pages
-      man-pages-posix
-      natscli
-      ncurses
-      openssl
-      nixos-generators
-      pciutils # lspci
-      podman
-      podman-compose
-      usbutils
-      psmisc
-      pwgen
-      qemu_full
-      quickemu
-      ripgrep
-      rsync
-      sops # simple flexible tool for secrets
-      tmux
-      unzip
-      vim
-      wget
-      xorg.xauth # needed for X11Forwarding
-      xorg.xeyes # for testing X connections
-    ]
-    ++ (import ./handy-tools.nix { inherit pkgs; }).full;
-
+    environment.systemPackages = with pkgs;
+      [
+        # git  # Installed via above programs.git.enable
+        alsa-lib
+        bind.dnsutils
+        clickhouse
+        cobalt # static site gen
+        zola # static site gen
+        fd
+        file
+        gnupg
+        helix
+        hello-custom # test overlays
+        htop
+        hydra-check
+        iotop
+        jq
+        just
+        lsb-release
+        man-pages
+        man-pages-posix
+        natscli
+        ncurses
+        openssl
+        nixos-generators
+        pciutils # lspci
+        podman
+        podman-compose
+        usbutils
+        psmisc
+        pwgen
+        qemu_full
+        quickemu
+        ripgrep
+        rsync
+        sops # simple flexible tool for secrets
+        tmux
+        unzip
+        vim
+        wget
+        xorg.xauth # needed for X11Forwarding
+        xorg.xeyes # for testing X connections
+      ]
+      ++ (import ./handy-tools.nix {inherit pkgs;}).full;
 
     environment.variables = rec {
       # Use absolute paths for these, in case some usage does not use PATH.
@@ -789,10 +871,10 @@ in
     nix = {
       settings = {
         auto-optimise-store = true;
-        experimental-features = [ "nix-command" "flakes" ];
+        experimental-features = ["nix-command" "flakes"];
       };
 
-      nixPath = [ "/etc/nix/path" ];
+      nixPath = ["/etc/nix/path"];
       # This fixes nixpkgs (for e.g. "nix shell") to match the system nixpkgs
       registry.nixpkgs.flake = inputs.nixpkgs;
 
