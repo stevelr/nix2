@@ -9,25 +9,25 @@
 }: let
   mkUsers = pkgs.myLib.mkUsers config.my.userids;
   mkGroups = pkgs.myLib.mkGroups config.my.userids;
+  nginxIP = "10.55.0.15";
 in {
   imports = [
     # Include the results of the hardware scan.
     ../../services
     ./hardware-configuration.nix
-    #./gitea.nix
   ];
 
   config = {
     my = {
       hostName = "aster";
-      hostDomain = "comet.pasilla.net";
-      localDomain = "cnet";
+      hostDomain = "pasilla.net";
+      localDomain = "pnet";
 
       pre.subnets = {
         # enp0s1
         "aster-lan0" = {
           name = "lan0";
-          domain = "comet.pasilla.net";
+          domain = "aster.pasilla.net";
           gateway = "10.135.1.1";
         };
 
@@ -40,8 +40,39 @@ in {
       };
 
       containers = {
-        gitea = {
+        nginx = {
           enable = true;
+          name = "nginx";
+          bridge = "container-br0";
+          address = nginxIP;
+          settings = {
+            www = {
+              enable = false;
+            };
+            ssl = {
+              enable = false;
+              hostPath = "";
+              localPath = "";
+            };
+            # bindmounts for certificates
+            mounts = let
+              certDir = "/root/certs/aster.pasilla.net";
+            in
+              {
+                "/var/local/www" = {hostPath = "/var/lib/www/${config.my.hostName}";};
+                "/etc/ssl/nginx/${config.my.hostName}.${config.my.hostDomain}" = {hostPath = certDir;};
+                # "/etc/ssl/nginx/seafile.pasilla.net" = {hostPath = certDir;};
+              }
+              // (lib.optionalAttrs config.my.containers.gitea.enable {
+                "/etc/ssl/nginx/gitea.pasilla.net" = {hostPath = certDir;};
+              })
+              // (lib.optionalAttrs config.my.containers.vault.enable {
+                "/etc/ssl/nginx/vault.pasilla.net" = {hostPath = certDir;};
+              });
+          };
+        };
+        gitea = {
+          enable = false;
           name = "gitea";
           bridge = "container-br0";
           address = "10.55.0.16";
@@ -232,6 +263,10 @@ in {
     networking = {
       hostName = "aster"; # Define your hostname.
       wireless.enable = false;
+
+      extraHosts = ''
+        ${nginxIP} aster.pasilla.net
+      '';
 
       networkmanager.enable = true;
 

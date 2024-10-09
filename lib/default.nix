@@ -39,6 +39,17 @@
           then s.${f}
           else {enable = false;};
 
+        # c = config.my.containers, f="cname"
+        optionalContainerAttrs = c: f: attrs:
+          if (lib.hasAttr f c) && c.${f}.enable
+          then attrs
+          else {};
+
+        optionalContainerList = c: f: list:
+          if (lib.hasAttr f c) && c.${f}.enable
+          then list
+          else [];
+
         # get first item in list, or null if param was empty list
         # examples:
         #   firstValue [ x y ]    -> x

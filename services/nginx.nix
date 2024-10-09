@@ -5,17 +5,19 @@
   lib,
   ...
 }: let
-  inherit (builtins) concatStringsSep;
+  inherit (builtins) concatStringsSep getAttr;
+  inherit (lib) optionalAttrs hasAttr;
   inherit (pkgs) myLib;
-  inherit (config.my.containers) nginx gitea vault seafile;
-  name = "nginx";
+  inherit (config.my.containers) nginx; # gitea vault seafile;
+  optCtrAttrs = pkgs.myLib.optionalContainerAttrs config.my.containers;
+  optCtrList = pkgs.myLib.optionalContainerList config.my.containers;
 
   cfg = myLib.configIf config.my.containers "nginx";
   bridgeCfg = config.my.subnets.${nginx.bridge};
   mkUsers = myLib.mkUsers config.my.userids;
   mkGroups = myLib.mkGroups config.my.userids;
 in {
-  containers = lib.optionalAttrs cfg.enable {
+  containers = optCtrAttrs "nginx" {
     nginx = {
       autoStart = true;
       privateNetwork = true;
@@ -33,13 +35,7 @@ in {
         ];
 
       # all bindings default to read-only
-      # static html
-      bindMounts."/var/local/www" = {hostPath = "/var/local/www/pangea";};
-      # tls certs
-      bindMounts."/etc/ssl/nginx/gitea.pasilla.net" = {hostPath = "/root/certs/gitea.pasilla.net";};
-      bindMounts."/etc/ssl/nginx/vault.pasilla.net" = {hostPath = "/root/certs/vault.pasilla.net";};
-      bindMounts."/etc/ssl/nginx/seafile.pasilla.net" = {hostPath = "/root/certs/seafile.pasilla.net";};
-      bindMounts."/etc/ssl/nginx/pangea.pasilla.net" = {hostPath = "/root/certs/pangea.pasilla.net";};
+      bindMounts = cfg.settings.mounts;
 
       config = {
         environment.systemPackages = with pkgs; [
@@ -52,9 +48,9 @@ in {
 
         networking =
           myLib.netDefaults nginx bridgeCfg
-          // {
-            firewall.allowedTCPPorts = [80 443 vault.settings.clusterPort];
-          };
+          // (optCtrAttrs "vault" {
+            firewall.allowedTCPPorts = [80 443 config.my.containers.vault.settings.clusterPort];
+          });
 
         users.users = mkUsers ["nginx"];
         users.groups = mkGroups ["nginx"];
@@ -148,44 +144,57 @@ in {
             log_format seafileformat '$http_x_forwarded_for $remote_addr [$time_local] "$request" $status $body_bytes_sent "$http_referer" "$http_user_agent" $upstream_response_time';
           '';
 
-          virtualHosts."pangea.pasilla.net" = let
-            grafanaCfg = config.my.containers.grafana;
-            domain = "pangea.pasilla.net";
-          in {
-            default = true;
-            addSSL = true;
-            http2 = true;
-            serverAliases = [
-              "pangea"
-              "pasilla.net"
-            ];
-            sslCertificate = "/etc/ssl/nginx/${domain}/fullchain1.pem";
-            sslCertificateKey = "/etc/ssl/nginx/${domain}/privkey1.pem";
-            sslTrustedCertificate = "/etc/ssl/nginx/${domain}/chain1.pem";
-            locations."/._status" = {
-              extraConfig = ''
-                stub_status on;
-                allow 0.0.0.0;
-              '';
-            };
-            locations."/grafana/" = {
-              proxyPass = "http://${toString grafanaCfg.address}:${toString grafanaCfg.proxyPort}";
-              proxyWebsockets = true;
-              #recommendedProxySettings = true;
-            };
+          virtualHosts."${config.my.hostName}.${config.my.hostDomain}" = let
+            domain = "${config.my.hostName}.${config.my.hostDomain}";
+          in
+            {
+              default = true;
+              addSSL = true;
+              http2 = true;
+              serverAliases = [
+                config.my.hostName
+                config.my.hostDomain
+              ];
+              sslCertificate = "/etc/ssl/nginx/${domain}/fullchain1.pem";
+              sslCertificateKey = "/etc/ssl/nginx/${domain}/privkey1.pem";
+              sslTrustedCertificate = "/etc/ssl/nginx/${domain}/chain1.pem";
+              locations."/._status" = {
+                extraConfig = ''
+                  stub_status on;
+                  allow 0.0.0.0;
+                '';
+              };
 
-            # static site
-            locations."/" = {
-              extraConfig = ''
-                autoindex off;
-                root /var/local/www;
-              '';
-            };
-          };
+              # static site
+              locations."/" = {
+                extraConfig = ''
+                  autoindex off;
+                  root /var/local/www;
+                '';
+              };
+            }
+            // (
+              optCtrAttrs "grafana" {
+                locations."/grafana/" = let
+                  grafanaCfg = config.my.containers.grafana;
+                in {
+                  proxyPass = "http://${toString grafanaCfg.address}:${toString grafanaCfg.proxyPort}";
+                  proxyWebsockets = true;
+                  #recommendedProxySettings = true;
+                };
+              }
+            );
 
           appendHttpConfig =
             concatStringsSep "\n"
-            (map (c: serverStanza c) [gitea vault seafile]);
+            (
+              map (c: serverStanza c) (
+                []
+                ++ (optCtrList "gitea" [(getAttr "gitea" config.my.containers)])
+                ++ (optCtrList "vault" [(getAttr "vault" config.my.containers)])
+                ++ (optCtrList "seafile" [(getAttr "seafile" config.my.containers)])
+              )
+            );
         };
 
         services.resolved.enable = false;
