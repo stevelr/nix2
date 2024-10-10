@@ -2,7 +2,10 @@
   pkgs,
   username,
   ...
-}: {
+}: let
+  inherit (pkgs.stdenv) isDarwin;
+  inherit (pkgs.lib) optionalAttrs;
+in {
   imports = [
     ./git.nix
     ./helix.nix
@@ -14,7 +17,7 @@
 
   home.username = username;
   home.homeDirectory =
-    if pkgs.stdenv.isDarwin
+    if isDarwin
     then "/Users/${username}"
     else "/home/${username}";
   home.stateVersion = "24.05";
@@ -100,15 +103,21 @@
       VISUAL = EDITOR;
       TERM = "xterm-256color";
     };
-    shellAliases = {
-      gd = "git diff";
-      gst = "git status";
-      gpu = "git push -u origin";
-      h = "hostname";
-      j = "just";
-      jwt-decode = "step crypto jwt inspect --insecure";
-      wkeys = "wezterm show-keys --lua"; # wezterm key mapping
-    };
+    shellAliases =
+      {
+        gd = "git diff";
+        gst = "git status";
+        gpu = "git push -u origin";
+        h = "hostname";
+        j = "just";
+        jwt-decode = "step crypto jwt inspect --insecure";
+        wkeys = "wezterm show-keys --lua"; # wezterm key mapping
+      }
+      # mac-specific aliases
+      // (optionalAttrs isDarwin {
+        flushdns = "sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder";
+      });
+
     # doesn't work with "Apple_Terminal". Should we set COLORTERM for everything if not Apple_Terminal,
     initExtra = ''
       if [[ "$TERM_PROGRAM" != "Apple_Terminal" ]]; then
