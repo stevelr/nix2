@@ -35,6 +35,12 @@ in {
       _1password # 1password cli
       ripgrep
       tailscale
+
+      # yubikey-related
+      yubikey-manager
+      yubikey-personalization
+      #yubikey-personalization-gui # broken (last checked: 10-10-2024)
+      age-plugin-yubikey
     ])
     ++ (lib.optionals isDarwin (with pkgs; [
       ## darwin-specifix config
@@ -64,6 +70,7 @@ in {
       "1password"
       "rectangle"
       "wezterm"
+      "yubico-authenticator" # nixpkg is yubioauth-flutter but only supported on linux
     ];
   };
 
