@@ -10,6 +10,7 @@
   mkUsers = pkgs.myLib.mkUsers config.my.userids;
   mkGroups = pkgs.myLib.mkGroups config.my.userids;
   nginxIP = "10.55.0.15";
+  containerNet = "10.55.0.0/24";
 in {
   imports = [
     # Include the results of the hardware scan.
@@ -40,12 +41,15 @@ in {
       };
 
       containers = {
-        nginx = {
+        nginx = let
+          subdomain = "aster.pasilla.net";
+        in {
           enable = true;
           name = "nginx";
           bridge = "container-br0";
           address = nginxIP;
           settings = {
+            subdomain = subdomain;
             www = {
               enable = false;
             };
@@ -56,18 +60,20 @@ in {
             };
             # bindmounts for certificates
             mounts = let
-              certDir = "/root/certs/aster.pasilla.net";
+              # on aster, we have wildcard cert for all virtual hosts,
+              # i.e., aster.pasilla.net and *.aster.pasilla.net
+              wildcardCertPath = {hostPath = "/root/certs/${subdomain}";};
             in
               {
-                "/var/local/www" = {hostPath = "/var/lib/www/${config.my.hostName}";};
-                "/etc/ssl/nginx/${config.my.hostName}.${config.my.hostDomain}" = {hostPath = certDir;};
-                # "/etc/ssl/nginx/seafile.pasilla.net" = {hostPath = certDir;};
+                "/var/local/www" = {hostPath = "/var/lib/www/${subdomain}";};
+                "/etc/ssl/nginx/${subdomain}" = wildcardCertPath;
+                # "/etc/ssl/nginx/seafile.${subdomain}" = wildcardCertPath;
               }
               // (lib.optionalAttrs config.my.containers.gitea.enable {
-                "/etc/ssl/nginx/gitea.pasilla.net" = {hostPath = certDir;};
+                "/etc/ssl/nginx/gitea.${subdomain}" = wildcardCertPath;
               })
               // (lib.optionalAttrs config.my.containers.vault.enable {
-                "/etc/ssl/nginx/vault.pasilla.net" = {hostPath = certDir;};
+                "/etc/ssl/nginx/vault.${subdomain}" = wildcardCertPath;
               });
           };
         };
@@ -98,14 +104,13 @@ in {
           proxyPort = config.my.ports.vault.port;
           settings = {
             enable = true;
-            # internal port
             #apiPort = 8200;
             clusterPort = 8201;
             clusterName = "aster.pasilla.net";
             # external api address
-            apiAddr = "https://aster.pasilla.net";
+            apiAddr = "https://vault.aster.pasilla.net"; # goes through nginx
             # external cluster address
-            clusterAddr = "https://aster.pasilla.net:8201";
+            clusterAddr = "aster.pasilla.net:8201";
             # server log level: trace,debug,info.warn,err
             logLevel = "info"; #
             storagePath = "/var/lib/vault";
@@ -119,6 +124,9 @@ in {
     # Bootloader.
     boot.loader.systemd-boot.enable = true;
     boot.loader.efi.canTouchEfiVariables = true;
+
+    # enable ip forwarding
+    boot.kernel.sysctl."net.ipv4.ip_forward" = 1;
 
     # use systemd-networkd, rather than the legacy systemd.network
     systemd.network.enable = true;
@@ -235,6 +243,7 @@ in {
       ripgrep
       starship
       tailscale
+      vault-bin
       vim
       wget
       wireguard-tools
@@ -263,28 +272,37 @@ in {
     networking = {
       hostName = "aster"; # Define your hostname.
       wireless.enable = false;
-
       extraHosts = ''
         ${nginxIP} aster.pasilla.net
+        ${nginxIP} vault.aster.pasilla.net
       '';
 
-      networkmanager.enable = true;
+      useNetworkd = true;
+      #networkmanager.enable = false;
 
       firewall = {
         enable = true;
-        allowedTCPPorts = [22 4222 41641];
+        allowedTCPPorts = [22 80 443 4222 41641];
       };
       nftables = {
         enable = true;
+        checkRuleset = true;
         tables."container-fwd" = {
           name = "container-fwd";
           enable = true;
           family = "ip";
           content = ''
-            # forwarding rule from containers out to WAN
+            chain pre {
+              type nat hook prerouting priority -100;
+              # forward incoming http,https to nginx
+              tcp dport {80,443} dnat to ${nginxIP}
+            }
             chain post {
               type nat hook postrouting priority srcnat; policy accept;
+              # from containers to WAN
               ip saddr 10.55.0.0/24 ip daddr != 10.55.0.0/24 masquerade
+              # http,https from wan to nginx
+              ip daddr ${nginxIP} masquerade
             }
           '';
         };

@@ -6,7 +6,6 @@
   ...
 }: let
   inherit (builtins) concatStringsSep getAttr;
-  inherit (lib) optionalAttrs hasAttr;
   inherit (pkgs) myLib;
   inherit (config.my.containers) nginx; # gitea vault seafile;
   optCtrAttrs = pkgs.myLib.optionalContainerAttrs config.my.containers;
@@ -39,6 +38,7 @@ in {
 
       config = {
         environment.systemPackages = with pkgs; [
+          bind.dnsutils # dig
           curl
           helix
           iproute2
@@ -89,19 +89,21 @@ in {
           };
 
           # allow larger requests for seafile
-          serverStanza = serverCfg: ''
+          serverStanza = serverCfg: let
+            serverName = "${serverCfg.name}.${cfg.settings.subdomain}";
+          in ''
             server {
               listen                    80;
-              server_name               ${serverCfg.name}.pasilla.net;
+              server_name               ${serverName};
               return                    301  https://$host$request_uri;
             }
             server {
               listen                    443 ssl;
               http2                     on;
-              server_name               ${serverCfg.name}.pasilla.net;
-              ssl_certificate           /etc/ssl/nginx/${serverCfg.name}.pasilla.net/fullchain1.pem;
-              ssl_certificate_key       /etc/ssl/nginx/${serverCfg.name}.pasilla.net/privkey1.pem;
-              ssl_trusted_certificate   /etc/ssl/nginx/${serverCfg.name}.pasilla.net/chain1.pem;
+              server_name               ${serverName};
+              ssl_certificate           /etc/ssl/nginx/${serverName}/fullchain1.pem;
+              ssl_certificate_key       /etc/ssl/nginx/${serverName}/privkey1.pem;
+              ssl_trusted_certificate   /etc/ssl/nginx/${serverName}/chain1.pem;
               ssl_protocols             TLSv1.2 TLSv1.3;
               ssl_session_timeout       10m;
               ssl_session_tickets       off;

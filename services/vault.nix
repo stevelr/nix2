@@ -33,6 +33,12 @@ in {
         isReadOnly = false;
       };
     };
+    forwardPorts = [
+      {
+        hostPort = cfg.settings.clusterPort;
+        containerPort = cfg.settings.clusterPort;
+      }
+    ];
     privateNetwork = true;
     hostBridge = bridgeCfg.name;
     localAddress = "${cfg.address}/${toString bridgeCfg.prefixLen}";
@@ -58,6 +64,8 @@ in {
           cluster_address = "0.0.0.0:${toString cfg.settings.clusterPort}"
           tls_disable = true
         }
+        # after we switch to handling tls directly, instead of terminating at nginx, set tls_min_version
+        # tls_min_version = "tls13"
         backend "raft" {
           path = "${storagePath}/data"
           node_id = "${cfg.bridge}"
