@@ -8,32 +8,26 @@
   inherit (builtins) concatStringsSep getAttr;
   inherit (pkgs) myLib;
   inherit (config.my.containers) nginx; # gitea vault seafile;
-  optCtrAttrs = pkgs.myLib.optionalContainerAttrs config.my.containers;
-  optCtrList = pkgs.myLib.optionalContainerList config.my.containers;
 
   cfg = myLib.configIf config.my.containers "nginx";
   bridgeCfg = config.my.subnets.${nginx.bridge};
   mkUsers = myLib.mkUsers config.my.userids;
   mkGroups = myLib.mkGroups config.my.userids;
+  # true if the container is proxied
+  isProxied = n: lib.lists.elem n cfg.settings.backends;
 in {
-  containers = optCtrAttrs "nginx" {
+  containers = lib.optionalAttrs cfg.enable {
     nginx = {
       autoStart = true;
       privateNetwork = true;
       hostBridge = bridgeCfg.name;
       localAddress = "${nginx.address}/${toString bridgeCfg.prefixLen}";
 
-      forwardPorts =
-        builtins.map (port: {
-          hostPort = port;
-          containerPort = port;
-        }) [
-          80
-          443
-          #vault.settings.clusterPort
-        ];
+      forwardPorts = builtins.map (port: {
+        hostPort = port;
+        containerPort = port;
+      }) [80 443];
 
-      # all bindings default to read-only
       bindMounts = cfg.settings.mounts;
 
       config = {
@@ -48,22 +42,26 @@ in {
 
         networking =
           myLib.netDefaults nginx bridgeCfg
-          // (optCtrAttrs "vault" {
-            firewall.allowedTCPPorts = [80 443 config.my.containers.vault.settings.clusterPort];
-          });
+          // {
+            firewall.allowedTCPPorts = [80 443];
+          };
 
         users.users = mkUsers ["nginx"];
         users.groups = mkGroups ["nginx"];
 
         services.nginx = let
-          perServerConfig = {
-            gitea = ''
-              client_max_body_size 24m;
-            '';
-            vault = ''
-              client_max_body_size 1m;
-            '';
-
+          perServerConfig =
+            {}
+            // (lib.optionalAttrs (isProxied "gitea") {
+              gitea = ''
+                client_max_body_size 24m;
+              '';
+            })
+            // (lib.optionalAttrs (isProxied "vault") {
+              vault = ''
+                client_max_body_size 1m;
+              '';
+            })
             # still debugging csrf error. might be useful info here
             # on seahub image, edit /opt/seafile/seafile-server-latest/seahub/seahub/settings.py
             #   add this line:
@@ -74,19 +72,19 @@ in {
             # then restart seahub container
             # reference:
             # https://stackoverflow.com/questions/70285834/forbidden-403-csrf-verification-failed-request-aborted-reason-given-for-fail
+            // (lib.optionalAttrs (isProxied "seafile") {
+              seafile = ''
+                client_max_body_size 0;
+                proxy_read_timeout   1200s;     # more time for uploads
+                proxy_set_header      X-Forwarded-Proto https;
 
-            seafile = ''
-              client_max_body_size 0;
-              proxy_read_timeout   1200s;     # more time for uploads
-              proxy_set_header      X-Forwarded-Proto https;
+                #proxy_set_header     X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header     X-Forwarded-Host $server_name;
 
-              #proxy_set_header     X-Forwarded-For $proxy_add_x_forwarded_for;
-              proxy_set_header     X-Forwarded-Host $server_name;
-
-              access_log           /var/log/nginx/seahub.access.log seafileformat;
-              error_log            /var/log/nginx/seahub.error.log;
-            '';
-          };
+                access_log           /var/log/nginx/seahub.access.log seafileformat;
+                error_log            /var/log/nginx/seahub.error.log;
+              '';
+            });
 
           # allow larger requests for seafile
           serverStanza = serverCfg: let
@@ -141,7 +139,7 @@ in {
             proxy_set_header     Upgrade $http_upgrade;
             proxy_set_header     Connection $connection_upgrade;
             resolver             ${bridgeCfg.gateway};
-            ssl_session_cache         shared:MozSSL:10m;
+            ssl_session_cache    shared:MozSSL:10m;
             proxy_headers_hash_max_size 2048;
             log_format seafileformat '$http_x_forwarded_for $remote_addr [$time_local] "$request" $status $body_bytes_sent "$http_referer" "$http_user_agent" $upstream_response_time';
           '';
@@ -175,26 +173,24 @@ in {
                 '';
               };
             }
-            // (
-              optCtrAttrs "grafana" {
-                locations."/grafana/" = let
-                  grafanaCfg = config.my.containers.grafana;
-                in {
-                  proxyPass = "http://${toString grafanaCfg.address}:${toString grafanaCfg.proxyPort}";
-                  proxyWebsockets = true;
-                  #recommendedProxySettings = true;
-                };
-              }
-            );
+            // (lib.optionalAttrs (isProxied "grafana") {
+              locations."/grafana/" = let
+                grafanaCfg = config.my.containers.grafana;
+              in {
+                proxyPass = "http://${toString grafanaCfg.address}:${toString grafanaCfg.proxyPort}";
+                proxyWebsockets = true;
+                #recommendedProxySettings = true;
+              };
+            });
 
           appendHttpConfig =
             concatStringsSep "\n"
             (
               map (c: serverStanza c) (
                 []
-                ++ (optCtrList "gitea" [(getAttr "gitea" config.my.containers)])
-                ++ (optCtrList "vault" [(getAttr "vault" config.my.containers)])
-                ++ (optCtrList "seafile" [(getAttr "seafile" config.my.containers)])
+                ++ (lib.optionals (isProxied "gitea") [(getAttr "gitea" config.my.containers)])
+                ++ (lib.optionals (isProxied "vault") [(getAttr "vault" config.my.containers)])
+                ++ (lib.optionals (isProxied "seafile") [(getAttr "seafile" config.my.containers)])
               )
             );
         };

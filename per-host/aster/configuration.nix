@@ -50,31 +50,42 @@ in {
           address = nginxIP;
           settings = {
             subdomain = subdomain;
-            www = {
-              enable = false;
-            };
-            ssl = {
-              enable = false;
-              hostPath = "";
-              localPath = "";
-            };
+
+            # list of containers that we proxy
+            # don't include vault if we want vault to terminate tls
+            backends = ["gitea"];
+
+            # [ss] is this used?
+            # www = {
+            #   enable = false;
+            # };
+
+            # [ss] what is this ssl section for?
+            # ssl = {
+            #   enable = false;
+            #   hostPath = "";
+            #   localPath = "";
+            # };
+
             # bindmounts for certificates
-            mounts = let
-              # on aster, we have wildcard cert for all virtual hosts,
-              # i.e., aster.pasilla.net and *.aster.pasilla.net
-              wildcardCertPath = {hostPath = "/root/certs/${subdomain}";};
-            in
-              {
-                "/var/local/www" = {hostPath = "/var/lib/www/${subdomain}";};
-                "/etc/ssl/nginx/${subdomain}" = wildcardCertPath;
-                # "/etc/ssl/nginx/seafile.${subdomain}" = wildcardCertPath;
-              }
-              // (lib.optionalAttrs config.my.containers.gitea.enable {
-                "/etc/ssl/nginx/gitea.${subdomain}" = wildcardCertPath;
-              })
-              // (lib.optionalAttrs config.my.containers.vault.enable {
-                "/etc/ssl/nginx/vault.${subdomain}" = wildcardCertPath;
-              });
+            mounts =
+              let
+                # on aster, we have wildcard cert for all virtual hosts,
+                # i.e., aster.pasilla.net and *.aster.pasilla.net
+                wildcardCertPath = {hostPath = "/root/certs/${subdomain}";};
+              in
+                {
+                  "/var/local/www" = {hostPath = "/var/lib/www/${subdomain}";};
+                  "/etc/ssl/nginx/${subdomain}" = wildcardCertPath;
+                  # "/etc/ssl/nginx/seafile.${subdomain}" = wildcardCertPath;
+                }
+                // (lib.optionalAttrs config.my.containers.gitea.enable {
+                  "/etc/ssl/nginx/gitea.${subdomain}" = wildcardCertPath;
+                })
+              # // (lib.optionalAttrs config.my.containers.vault.enable {
+              #   "/etc/ssl/nginx/vault.${subdomain}" = wildcardCertPath;
+              # });
+              ;
           };
         };
         gitea = {
@@ -104,13 +115,19 @@ in {
           proxyPort = config.my.ports.vault.port;
           settings = {
             enable = true;
-            #apiPort = 8200;
+            apiPort = config.my.ports.vault.port;
+            uiEnable = true;
+            tls = {
+              enable = true;
+              chain = "/root/certs/vault.aster.pasilla.net/fullchain1.pem";
+              privkey = "/root/certs/vault.aster.pasilla.net/privkey1.pem";
+            };
             clusterPort = 8201;
             clusterName = "aster.pasilla.net";
             # external api address
-            apiAddr = "https://vault.aster.pasilla.net"; # goes through nginx
+            apiAddr = "https://vault.aster.pasilla.net:8200";
             # external cluster address
-            clusterAddr = "aster.pasilla.net:8201";
+            clusterAddr = "vault.aster.pasilla.net:8201";
             # server log level: trace,debug,info.warn,err
             logLevel = "info"; #
             storagePath = "/var/lib/vault";

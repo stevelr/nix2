@@ -15,25 +15,44 @@
 #   Save root token and unseal keys in 1password
 #   TODO: work out interactive way to start vault with the unseal keys so they aren't on disk
 let
+  inherit (pkgs) myLib;
+  inherit (lib) optionalString;
+
   name = "vault";
   cfg = config.my.containers.${name};
-  # api addr used during setup. external api uses other scripts
-  localApiAddr = "http://127.0.0.1:${toString cfg.proxyPort}";
+  # api addr used during setup. external api uses apiAddr
+  localApiAddr = "https://vault.aster.pasilla.net:${toString cfg.settings.apiPort}";
   bridgeCfg = config.my.subnets.${cfg.bridge};
   storagePath = "/var/lib/vault";
-  inherit (pkgs) myLib;
   mkUsers = myLib.mkUsers config.my.userids;
   mkGroups = myLib.mkGroups config.my.userids;
+  # local paths for tls cert and private key
+  tlsCertDir = "/etc/ssl/vault";
+  tlsCertPath = "${tlsCertDir}/fullchain.pem";
+  tlsKeyPath = "${tlsCertDir}/privkey.pem";
 in {
   containers.${name} = lib.optionalAttrs cfg.enable {
     autoStart = cfg.enable;
-    bindMounts = {
-      "${storagePath}" = {
-        hostPath = "/var/lib/vault";
-        isReadOnly = false;
-      };
-    };
+    bindMounts =
+      {
+        "${storagePath}" = {
+          hostPath = "/var/lib/vault";
+          isReadOnly = false;
+        };
+      }
+      # add tls certs if vault is tls endpoint
+      // (lib.optionalAttrs cfg.settings.tls.enable {
+        "${tlsCertDir}/fullchain.pem" = {hostPath = cfg.settings.tls.chain;};
+        "${tlsCertDir}/privkey.pem" = {hostPath = cfg.settings.tls.privkey;};
+      });
+
+    ephemeral = true;
+
     forwardPorts = [
+      {
+        hostPort = cfg.settings.apiPort;
+        containerPort = cfg.settings.apiPort;
+      }
       {
         hostPort = cfg.settings.clusterPort;
         containerPort = cfg.settings.clusterPort;
@@ -46,7 +65,9 @@ in {
     config = {
       environment.variables.TZ = config.my.containerCommon.timezone;
       environment.systemPackages = with pkgs; [
+        bind.dnsutils
         vault-bin
+        lsof
         jq
       ];
       environment.etc."vault.d/vault.hcl".text = ''
@@ -57,12 +78,19 @@ in {
         cluster_addr = "${cfg.settings.clusterAddr}"
         disable_cache = true
         disable_mlock = true
-        ui = true
         log_level = "${cfg.settings.logLevel}"
+        ${optionalString cfg.settings.uiEnable "ui = true"}
         listener "tcp" {
-          address = "0.0.0.0:${toString cfg.proxyPort}"
+          address = "0.0.0.0:${toString cfg.settings.apiPort}"
           cluster_address = "0.0.0.0:${toString cfg.settings.clusterPort}"
+          ${optionalString cfg.settings.tls.enable ''
+          tls_cert_file = "${tlsCertPath}"
+          tls_key_file = "${tlsKeyPath}"
+          tls_min_version = "tls13"
+        ''}
+          ${optionalString (!cfg.settings.tls.enable) ''
           tls_disable = true
+        ''}
         }
         # after we switch to handling tls directly, instead of terminating at nginx, set tls_min_version
         # tls_min_version = "tls13"
@@ -77,13 +105,19 @@ in {
       networking =
         myLib.netDefaults cfg bridgeCfg
         // {
+          extraHosts = ''
+            127.0.0.1 vault.aster.pasilla.net
+          '';
           firewall.allowedTCPPorts = [
-            cfg.proxyPort
+            cfg.settings.apiPort
             cfg.settings.clusterPort
           ];
         };
 
       services.resolved.enable = false; # force bridge nameserver
+
+      # use stable mac address for dhcp consistency
+      systemd.network.networks.eth0.dhcpV4Config.ClientIdentifier = "mac";
 
       systemd.services.vault = {
         wantedBy = ["multi-user.target"];
@@ -97,7 +131,6 @@ in {
           StartLimitIntervalSec = 60;
           StartLimitBurst = 3;
         };
-
         serviceConfig = {
           ExecStart = "${pkgs.vault-bin}/bin/vault server -config /etc/vault.d";
           ExecReload = "/run/current-system/sw/bin/kill --signal HUP $MAINPID";
@@ -163,6 +196,10 @@ in {
         after = ["vault.service"];
         path = with pkgs; [curl jq];
         enable = cfg.enable;
+        serviceConfig = {
+          User = "root";
+          Group = "root";
+        };
         script = ''
           set -a
           source "${env-path}"
