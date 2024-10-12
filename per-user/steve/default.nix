@@ -53,6 +53,7 @@ in {
     rsync
     socat
     starship
+    vault-bin
   ];
 
   # directories to add to PATH

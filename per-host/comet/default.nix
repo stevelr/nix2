@@ -9,9 +9,15 @@ in {
   services.nix-daemon.enable = true;
   # Necessary for using flakes on this system.
   nix.settings.experimental-features = "nix-command flakes";
-
   # ???
   nix.package = pkgs.nixVersions.git;
+
+  nixpkgs.hostPlatform = "aarch64-darwin";
+  nixpkgs.config.allowUnfreePredicate = pkg:
+    builtins.elem (lib.getName pkg) [
+      "1password-cli"
+      "vault-bin"
+    ];
 
   # Used for backwards compatibility. please read the changelog
   # before changing: `darwin-rebuild changelog`.
@@ -22,7 +28,6 @@ in {
     home = "/Users/steve";
   };
 
-  nixpkgs.hostPlatform = "aarch64-darwin";
   networking.hostName = hostname;
 
   environment.systemPackages =
@@ -53,11 +58,6 @@ in {
   environment.pathsToLink = [
     "/share/zsh" # completion for system packages e.g., systemd
   ];
-
-  nixpkgs.config.allowUnfreePredicate = pkg:
-    builtins.elem (lib.getName pkg) [
-      "1password-cli"
-    ];
 
   homebrew = lib.optionalAttrs isDarwin {
     enable = true;
