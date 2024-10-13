@@ -118,7 +118,7 @@ in
         };
         services.resolved.enable = false;
         environment.variables.TZ = config.my.containerCommon.timezone;
-        system.stateVersion = 24.05; # config.my.containerCommon.stateVersion;
+        system.stateVersion = 24.05; # broken in 24.11 # config.my.containerCommon.stateVersion;
       }; # config
     }; # container
   }

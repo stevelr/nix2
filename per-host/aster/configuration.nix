@@ -12,7 +12,7 @@
   mkUsers = pkgs.myLib.mkUsers config.my.userids;
   mkGroups = pkgs.myLib.mkGroups config.my.userids;
   nginxIP = "10.55.0.15";
-  containerNet = "10.55.0.0/24";
+  #containerNet = "10.55.0.0/24";
 in {
   imports = [
     # Include the results of the hardware scan.
@@ -51,6 +51,18 @@ in {
         };
         tailscale.enable = false;
         kea.enable = false;
+      };
+
+      vpnNamespaces = {
+        ns101 = {
+          name = "ns101";
+          enable = true;
+          lanIface = "eth0";
+          veNsIp4 = "192.168.10.11";
+          veHostIp4 = "192.168.10.10";
+          wgIp4 = "10.2.0.2"; # local (vpn client) interface addr in wg tunnel
+          vpnDns = ["10.2.0.1"]; # dns server(s) for vpn clients
+        };
       };
 
       containers = {
@@ -97,6 +109,7 @@ in {
           name = "nettest";
           bridge = "container-br0";
           address = "10.55.0.20";
+          namespace = "ns101"; # make it run inside this vpn namespace
         };
 
         gitea = {
@@ -146,7 +159,7 @@ in {
     boot.loader.systemd-boot.enable = true;
     boot.loader.efi.canTouchEfiVariables = true;
 
-    # enable ip forwarding
+    # enable ip forwarding - required for routing and for vpns
     boot.kernel.sysctl."net.ipv4.ip_forward" = 1;
 
     # use systemd-networkd, rather than the legacy systemd.network
@@ -381,12 +394,6 @@ in {
       ];
     };
 
-    # This value determines the NixOS release from which the default
-    # settings for stateful data, like file locations and database versions
-    # on your system were taken. It‘s perfectly fine and recommended to leave
-    # this value at the release version of the first install of this system.
-    # Before changing this value read the documentation for this option
-    # (e.g. man configuration.nix or on https://nixos.org/nixos/options.html).
-    system.stateVersion = "24.05"; # Did you read the comment?
+    system.stateVersion = "24.11";
   };
 }

@@ -20,7 +20,7 @@ in {
     if isDarwin
     then "/Users/${username}"
     else "/home/${username}";
-  home.stateVersion = "24.05";
+  home.stateVersion = "24.11";
 
   home.packages = with pkgs; [
     # nats

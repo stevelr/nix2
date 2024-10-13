@@ -8,7 +8,7 @@
   lib ? pkgs.lib,
   ...
 }: let
-  inherit (lib) concatStringsSep init length splitString;
+  inherit (lib) concatMapStrings concatStringsSep init length splitString;
   inherit (builtins) isNull;
 
   # returns expr if expr is not null, otherwise returns other
@@ -117,6 +117,35 @@
             };
           })
         );
+
+        # merge this into continer configuration
+        # if it's supposed to run inside vpn
+        # cfg is namespace config
+        vpnContainerConfig = cfg: {
+          autoStart = false;
+          extraFlags = ["--network-namespace-path=/run/netns/${cfg.name}"];
+          enableTun = true; # access /dev/net/tun
+          privateNetwork = false; # unset if set: cannot be used in namespace
+          config.environment.etc."resolv.conf".text = let
+            # set dns resolver to the vpn's dns
+            # set edns0 to enable extensions including DNSSEC
+            nameservers =
+              concatMapStrings (ip: ''
+                nameserver ${ip}
+              '')
+              cfg.vpnDns;
+          in
+            lib.mkForce ''
+              option edns0
+              ${nameservers}
+            '';
+          # config.networking.useHostResolvConf = lib.mkForce false;
+          # config.networking.resolvconf.enable = false;
+          # config.networking.nameservers = cfg.vpnDns;
+          # config.networking.useNetworkd = true;
+          # config.networking.firewall.enable = false;
+          # config.networking.nftables.enable = true;
+        };
 
         # # Merges list of records, concatenates arrays, if two values can't be merged - the latter is preferred
         # recursiveMerge = attrList:

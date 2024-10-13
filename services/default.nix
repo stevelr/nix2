@@ -9,9 +9,10 @@
   inherit (lib) mkOption mkEnableOption types;
   inherit (pkgs.myLib) valueOr;
 
-  # extract first part of ip addr  "10.11.12.13" -> "10.11.12"
+  # extract first three octets of ipv4 addr  "10.11.12.13" -> "10.11.12"
   first24 = addr: builtins.head (builtins.head (builtins.tail (builtins.split "([0-9]+\.[0-9]+\.[0-9]+)\.[0-9]+" addr)));
 
+  # dhcpv4 pool x.x.x.100-x.x.x.199 (assumed to be within /24 subnet)
   defaultPool = addr: let
     prefix = first24 addr;
   in "${prefix}.100-${prefix}.199";
@@ -62,13 +63,6 @@
       '';
     };
 
-    # addressCIDR = mkOption {
-    #   type = types.nullOr types.str;
-    #   example = "10.10.10.82/24";
-    #   default = null;
-    #   description = "address in CIDR form. Defaults to <address>/<prefixLen>";
-    # };
-
     settings = mkOption {
       type = types.attrsOf types.anything;
       description = "other settings";
@@ -82,22 +76,15 @@
         primary exposed port - proxy target from nginx
       '';
     };
-  };
 
-  # fill in defaults from containerOptions
-  # makeContainer = c: (lib.optionalAttrs c.enable {
-  #   bridge = c.bridge;
-  #   address = c.address;
-  #   name = c.name;
-  #   prefixLen = c.prefixLen;
-  #   addressCIDR =
-  #     if (! isNull c.address) && (isNull c.addressCIDR)
-  #     then "${c.address}/${toString c.prefixLen}"
-  #     else c.addressCIDR;
-  #   proxyPort = c.proxyPort;
-  #   settings = c.settings;
-  #   enable = c.enable;
-  # });
+    namespace = mkOption {
+      type = types.nullOr types.str;
+      default = null;
+      description = ''
+        Network namespace, if container runs in vpn
+      '';
+    };
+  };
 
   netOptions = {
     name = mkOption {
@@ -299,7 +286,7 @@ in {
     ./vault.nix
     ./unbound.nix
     ./unbound-sync.nix
-    #./wgrouter.nix
+    ./wgrouter.nix
   ];
 
   options = {
@@ -441,12 +428,58 @@ in {
         '';
       };
 
+      vpnNamespaces = mkOption {
+        type = types.attrsOf (types.submodule {
+          options = {
+            enable = mkOption {
+              type = types.bool;
+              description = "enable the vpn namespace";
+              default = true;
+              example = false;
+            };
+            name = mkOption {
+              type = types.str;
+              example = "ns";
+              description = "namespace name";
+            };
+            lanIface = mkOption {
+              type = types.str;
+              example = "enp2s0";
+              description = "name of lan interface on host";
+            };
+            veNsIp4 = mkOption {
+              type = types.str;
+              example = "192.168.10.11";
+              description = "ip addr of veth bridge in namespace";
+            };
+            veHostIp4 = mkOption {
+              type = types.str;
+              example = "192.168.10.10";
+              description = "ip addr ofveth bridge on host";
+            };
+            wgIp4 = mkOption {
+              type = types.str;
+              example = "10.2.0.2";
+              description = "client(local) ip addr in tunnel";
+            };
+            vpnDns = mkOption {
+              type = types.listOf types.str;
+              example = ["10.2.0.1"];
+              description = "dns servers for vpn clients";
+            };
+          };
+        });
+        default = {};
+        description = "wireguard vpns";
+      };
+
       containerCommon = mkOption {
         type = types.submodule {
           options = {
             stateVersion = mkOption {
               type = types.str;
               description = "default nixos stateVersion for containers";
+              #default = "24.11";
             };
             timezone = mkOption {
               type = types.str;
