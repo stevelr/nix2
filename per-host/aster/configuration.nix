@@ -53,6 +53,8 @@ in {
         kea.enable = false;
       };
 
+      # network namespaces with routing through wireguard vpn
+      # each namespace requires a file /etc/router/NAMESPACE/wg.conf
       vpnNamespaces = {
         ns101 = {
           name = "ns101";
