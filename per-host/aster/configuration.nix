@@ -7,6 +7,8 @@
   lib,
   ...
 }: let
+  inherit (lib) optionalString;
+
   mkUsers = pkgs.myLib.mkUsers config.my.userids;
   mkGroups = pkgs.myLib.mkGroups config.my.userids;
   nginxIP = "10.55.0.15";
@@ -24,11 +26,12 @@ in {
       hostDomain = "pasilla.net";
       localDomain = "pnet";
 
+      # later converted to my.subnets
       pre.subnets = {
         # enp0s1
         "aster-lan0" = {
           name = "lan0";
-          domain = "aster.pasilla.net";
+          domain = "pasilla.net";
           gateway = "10.135.1.1";
         };
 
@@ -36,8 +39,18 @@ in {
         "container-br0" = {
           name = "br0";
           gateway = "10.55.0.1";
+          domain = "aster.pasilla.net";
           dhcp.enable = true;
         };
+      };
+
+      services = {
+        unbound = {
+          enable = true;
+          wanNet = "aster-lan0";
+        };
+        tailscale.enable = false;
+        kea.enable = false;
       };
 
       containers = {
@@ -53,7 +66,7 @@ in {
 
             # list of containers that we proxy
             # don't include vault if we want vault to terminate tls
-            backends = ["gitea"];
+            backends = [];
 
             # [ss] is this used?
             # www = {
@@ -68,26 +81,24 @@ in {
             # };
 
             # bindmounts for certificates
-            mounts =
-              let
-                # on aster, we have wildcard cert for all virtual hosts,
-                # i.e., aster.pasilla.net and *.aster.pasilla.net
-                wildcardCertPath = {hostPath = "/root/certs/${subdomain}";};
-              in
-                {
-                  "/var/local/www" = {hostPath = "/var/lib/www/${subdomain}";};
-                  "/etc/ssl/nginx/${subdomain}" = wildcardCertPath;
-                  # "/etc/ssl/nginx/seafile.${subdomain}" = wildcardCertPath;
-                }
-                // (lib.optionalAttrs config.my.containers.gitea.enable {
-                  "/etc/ssl/nginx/gitea.${subdomain}" = wildcardCertPath;
-                })
-              # // (lib.optionalAttrs config.my.containers.vault.enable {
-              #   "/etc/ssl/nginx/vault.${subdomain}" = wildcardCertPath;
-              # });
-              ;
+            mounts = let
+              # on aster, we have wildcard cert for all virtual hosts,
+              # i.e., aster.pasilla.net and *.aster.pasilla.net
+              wildcardCertPath = {hostPath = "/root/certs/${subdomain}";};
+            in {
+              "/var/local/www" = {hostPath = "/var/lib/www/${subdomain}";};
+              "/etc/ssl/nginx/${subdomain}" = wildcardCertPath;
+            };
           };
         };
+
+        nettest = {
+          enable = true;
+          name = "nettest";
+          bridge = "container-br0";
+          address = "10.55.0.20";
+        };
+
         gitea = {
           enable = false;
           name = "gitea";
@@ -99,13 +110,6 @@ in {
             hostSsh = 3022;
           };
         };
-
-        # clickhouse.enable = false;
-        # grafana.enable = false;
-        # unbound.enable = false;
-        # nettest.enable = false;
-        # nginx.enable = false;
-        # "empty-static".enable = false;
 
         vault = {
           enable = true;
@@ -149,7 +153,7 @@ in {
     systemd.network.enable = true;
 
     systemd.network.networks."50-br0" = let
-      cfg = config.my.pre.subnets."container-br0";
+      cfg = config.my.subnets."container-br0";
     in {
       matchConfig.Name = cfg.name;
       address = ["${cfg.gateway}/${toString cfg.prefixLen}"];
@@ -299,11 +303,48 @@ in {
 
       firewall = {
         enable = true;
-        allowedTCPPorts = [22 80 443 4222 41641];
+        allowedUDPPorts = [53];
+        allowedTCPPorts =
+          [22 53]
+          ++ (lib.optionals config.my.services.tailscale.enable [config.my.ports.tailscale.port])
+          ++ (lib.optionals config.my.containers.vault.enable [config.my.ports.vault.port config.my.ports.vaultCluster.port]);
       };
       nftables = {
         enable = true;
         checkRuleset = true;
+        # tables.host = {
+        #   name = "host";
+        #   family = "inet";
+        #   content = ''
+        #     chain input {
+        #       # priority -20 to run before default input chain at priority 0 ("filter")
+        #       type filter hook input priority -20; policy drop;
+        #       iif "lo" accept
+        #       ct state invalid drop
+        #       ct state { established, related } counter packets 0 bytes 0 accept
+
+        #       # any forwardPorts defined in nspawn containers are forwarded by dnat rules
+        #       # in tables (ip io.systemd.nat) and (ip6 io.systemd.nat) created by systemd.
+        #       # Those ports need to be accepted here at priority 0.
+        #       tcp dport { ssh, http, https, \
+        #           ${toString config.my.ports.nats.port}, \
+        #           ${toString config.my.ports.vault.port}, \
+        #           ${toString config.my.ports.vaultCluster.port}, \
+        #           } accept
+
+        #       # tailscale, if enabled
+        #       ${optionalString config.my.services.tailscale.enable "udp dport ${toString config.my.ports.tailscale.port}"}
+
+        #       # allow dhcp and icmp
+        #       udp dport { 67,68 }                    accept comment "dhcp"
+        #       ip protocol 1                          accept comment "icmp"
+        #       meta l4proto 58                        accept comment "icmpv6"
+
+        #       # everything else dropped
+        #     }
+        #   '';
+        # };
+
         tables."container-fwd" = {
           name = "container-fwd";
           enable = true;

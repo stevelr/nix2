@@ -257,38 +257,6 @@ in let
       default = {};
     };
   };
-
-  makeNet = n: let
-    dns = valueOr n.dns n.gateway;
-    hasDhcp = (! isNull n.dhcp) && n.dhcp.enable;
-  in {
-    name = n.name;
-    localDev = n.localDev;
-    gateway = n.gateway;
-    prefixLen = n.prefixLen;
-    macAddress = n.macAddress;
-    address = valueOr n.address n.gateway;
-    net = valueOr n.net "${first24 n.gateway}.0/${toString n.prefixLen}";
-    inherit dns;
-    dnsServers = valueOr n.dnsServers [dns];
-    domain = valueOr n.domain "${n.name}.${config.my.localDomain}";
-    settings = n.settings;
-    dhcp = {
-      enable = hasDhcp;
-      pool =
-        if hasDhcp && (! isNull n.dhcp.pool)
-        then n.dhcp.pool
-        else defaultPool n.gateway;
-      id =
-        if hasDhcp && n.dhcp.id == -1
-        then (pkgs.myLib.nethash n)
-        else n.dhcp.id;
-      reservations =
-        if hasDhcp
-        then n.dhcp.reservations
-        else [];
-    };
-  };
 in {
   imports = [
     (../per-host + "/${hostname}")

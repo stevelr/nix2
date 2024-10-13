@@ -5,14 +5,9 @@
   lib,
   ...
 }: let
-  inherit (builtins) attrNames listToAttrs isNull;
+  inherit (builtins) isNull;
   inherit (lib) mkOption mkEnableOption types;
-  inherit (lib.attrsets) filterAttrs;
-
-  valueOr = expr: other:
-    if (! isNull expr)
-    then expr
-    else other;
+  inherit (pkgs.myLib) valueOr;
 
   # extract first part of ip addr  "10.11.12.13" -> "10.11.12"
   first24 = addr: builtins.head (builtins.head (builtins.tail (builtins.split "([0-9]+\.[0-9]+\.[0-9]+)\.[0-9]+" addr)));
@@ -265,7 +260,12 @@
     address = valueOr n.address n.gateway;
     net = valueOr n.net "${first24 n.gateway}.0/${toString n.prefixLen}";
     inherit dns;
-    dnsServers = valueOr n.dnsServers [dns];
+    dnsServers = valueOr n.dnsServers (
+      # TODO: if dnsServers, dns, and gateway are all null, we don't have dns servers, so set to null here
+      if (! isNull dns)
+      then [dns]
+      else null
+    );
     domain = valueOr n.domain "${n.name}.${config.my.localDomain}";
     settings = n.settings;
     dhcp = {
@@ -397,8 +397,8 @@ in {
         default = {enable = false;};
       };
 
-      # initial data to be post-processed
       pre = {
+        # initial data to be post-processed
         subnets = mkOption {
           type = types.attrsOf (types.submodule {
             options = netOptions;
@@ -406,7 +406,6 @@ in {
           default = {};
           description = "bridge networks connecting containers";
         };
-
         hostNets = mkOption {
           type = types.attrsOf (types.submodule {
             options = netOptions;
@@ -459,9 +458,22 @@ in {
         description = "default options for containers.";
       };
 
-      service = mkOption {
+      services = mkOption {
         type = types.submodule {
           options = {
+            unbound = mkOption {
+              type = types.submodule {
+                options = {
+                  enable = mkEnableOption "Unbound dns server";
+                  wanNet = mkOption {
+                    type = types.str;
+                    description = "name of host wan/upstream network";
+                    example = "host-lan0";
+                  };
+                };
+              };
+            };
+
             tailscale = mkOption {
               type = types.submodule {
                 options = {
@@ -480,6 +492,7 @@ in {
             kea = mkOption {
               type = types.submodule {
                 options = {
+                  enable = mkEnableOption "Kea DHCP";
                   control-agent = mkOption {
                     type = types.submodule {
                       options = {
@@ -602,12 +615,17 @@ in {
         description = "node exporter";
       };
       ssh = {port = 22;};
-      tailscale = {port = 41641;}; # config.my.service.tailscale.port;
+      tailscale = {port = 41641;}; # config.my.services.tailscale.port;
       unbound = {port = 53;};
       vault = {
         port = 8200;
         description = "Hashicorp vault api port";
       };
+      vaultCluster = {
+        port = 8201;
+        description = "Hashicorp vault cluster port";
+      };
+
       vector = {port = 8686;};
       ##qryn = { port = 3100; };
     };

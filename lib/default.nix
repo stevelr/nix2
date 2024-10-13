@@ -11,6 +11,12 @@
   inherit (lib) concatStringsSep init length splitString;
   inherit (builtins) isNull;
 
+  # returns expr if expr is not null, otherwise returns other
+  valueOr = expr: other:
+    if (! isNull expr)
+    then expr
+    else other;
+
   scope = rec {
     propagate = {inherit pkgs lib myLib;};
 
@@ -26,7 +32,7 @@
       // limitedTo.lib
       // {
         inherit limitedTo;
-
+        inherit valueOr;
         inherit (userFuncs) mkUsers mkGroups;
 
         # makeHelloTestPkg = import ./make-hello-test-package.nix propagate;
@@ -94,7 +100,8 @@
             # set default route
             defaultGateway.address = brCfg.gateway;
             # set namerver and search (will go into /etc/resolv.conf)
-            nameservers = brCfg.dnsServers;
+            # this can be empty if subnet does not define dnsServers, dns, or gateway
+            nameservers = valueOr brCfg.dnsServers [];
             search = [brCfg.domain];
           })
           // (lib.optionalAttrs (!isNull ctCfg.address) {

@@ -22,7 +22,7 @@ in {
           [
             hello
           ]
-          ++ (import ../nixos/handy-tools.nix {inherit pkgs;}).full;
+          ++ (import ../modules/handy-tools.nix {inherit pkgs;}).full;
 
         services.openssh.enable = true;
 
