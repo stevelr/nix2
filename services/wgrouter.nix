@@ -19,6 +19,10 @@
 # currently supports ipv4 only
 #
 # TODO: add health check for vpn
+#    leaktest: curl -o dnsleaktest.sh -s https://raw.githubusercontent.com/macvk/dnsleaktest/b03ab54d574adbe322ca48cbcb0523be720ad38d/dnsleaktest.sh
+#       sh ./dnsleaktest.sh
+#     iptest: curl -s ipinfo.io
+#
 # TODO: don't have network connectivity from host, for example, if container runs sshd, can't ssh to it. Needs debugging. OTOH, lack of network connectivity is good because we know there are no leaks
 {
   config,

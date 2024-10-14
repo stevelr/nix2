@@ -9,6 +9,8 @@
   inherit (lib) mkOption mkEnableOption types;
   inherit (pkgs.myLib) valueOr;
 
+  media-group-gid = 4502;
+
   # extract first three octets of ipv4 addr  "10.11.12.13" -> "10.11.12"
   first24 = addr: builtins.head (builtins.head (builtins.tail (builtins.split "([0-9]+\.[0-9]+\.[0-9]+)\.[0-9]+" addr)));
 
@@ -288,6 +290,7 @@ in {
     ./unbound-sync.nix
     ./vpn-sh.nix
     ./wgrouter.nix
+    ./media
   ];
 
   options = {
@@ -370,6 +373,12 @@ in {
               default = false;
               example = true;
               description = "true if the user logs in";
+            };
+            extraGroups = mkOption {
+              type = types.nullOr (types.listOf types.str);
+              default = null;
+              example = ["audio"];
+              description = "optional list of additional groups for the user";
             };
           };
         });
@@ -637,10 +646,27 @@ in {
       };
       #exporter = { uid = 4017; gid = 4017; }; # generic for node exporters
 
+      jellyfin = {
+        uid = 4100;
+        gid = 4100;
+        extraGroups = ["media-group"];
+      };
+      sonarr = {
+        uid = 4101;
+        gid = 4101;
+        extraGroups = ["media-group"];
+      };
+      radarr = {
+        uid = 4102;
+        gid = 4102;
+        extraGroups = ["media-group"];
+      };
+
       # developer group
       developer = {gid = 4500;};
       # prometheus exporters
       exporters = {gid = 4501;};
+      media-group = {gid = media-group-gid;};
     };
 
     # service ports
@@ -668,10 +694,19 @@ in {
 
       vector = {port = 8686;};
       ##qryn = { port = 3100; };
+
+      # media-group
+      jellyfin = {port = 8096;};
+      radarr = {port = 7878;};
+      sonarr = {port = 8989;};
+      prowlarr = {port = 9696;};
+      readarr = {port = 8787;};
+      lidarr = {port = 8686;};
+      bazarr = {port = 6767;};
     };
 
     my.containerCommon.timezone = "Etc/UTC";
-    my.containerCommon.stateVersion = "24.05";
+    my.containerCommon.stateVersion = "24.11";
 
     my.subnets = builtins.mapAttrs (_: n: (makeNet n)) config.my.pre.subnets;
     my.hostNets = builtins.mapAttrs (_: n: (makeNet n)) config.my.pre.hostNets;

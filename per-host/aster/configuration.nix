@@ -115,6 +115,14 @@ in {
           namespace = "ns101"; # make it run inside this vpn namespace
         };
 
+        media = {
+          enable = true;
+          name = "media";
+          bridge = "container-br0";
+          address = "10.55.0.40";
+          namespace = "ns101";
+        };
+
         "vpn-sh" = {
           enable = true;
           name = "vpn-sh";
@@ -206,6 +214,16 @@ in {
       LC_PAPER = "en_US.UTF-8";
       LC_TELEPHONE = "en_US.UTF-8";
       LC_TIME = "en_US.UTF-8";
+    };
+
+    services.ntp = {
+      enable = true;
+      servers = [
+        "0.us.pool.ntp.org"
+        "1.us.pool.ntp.org"
+        "2.us.pool.ntp.org"
+        "3.us.pool.ntp.org"
+      ];
     };
 
     # Enable the X11 windowing system.
@@ -388,22 +406,7 @@ in {
           '';
         };
       };
-
-      timeServers = [
-        # using ip adddresses because for kea option-data.ntp-servers needs ip addresses.
-        # TODO: figure out how to make it dynamic - perhaps at container boot time?
-        "23.186.168.1"
-        "72.14.183.39"
-        "23.150.41.123"
-        "23.150.40.242"
-        "162.159.200.1"
-        #"0.us.pool.ntp.org"
-        #"1.us.pool.ntp.org"
-        #"2.us.pool.ntp.org"
-        #"3.us.pool.ntp.org"
-      ];
     };
-
     system.stateVersion = "24.11";
   };
 }

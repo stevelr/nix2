@@ -24,7 +24,7 @@ in {
         # if uid == gid, group name is same as user name
         // (lib.optionalAttrs
           (x.value.uid == x.value.gid && ! isNull x.value.uid)
-          {group = "${x.name}";})
+          {group = mkForce "${x.name}";})
         # for interfactive users, set default shell and enable linger
         // (lib.optionalAttrs x.value.isInteractive {
           isNormalUser = true;
@@ -34,6 +34,9 @@ in {
         # system user
         // (lib.optionalAttrs (! x.value.isInteractive) {
           isSystemUser = true;
+        })
+        // (lib.optionalAttrs (!isNull x.value.extraGroups) {
+          extraGroups = x.value.extraGroups;
         });
     })
     (
