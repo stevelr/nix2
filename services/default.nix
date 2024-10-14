@@ -286,6 +286,7 @@ in {
     ./vault.nix
     ./unbound.nix
     ./unbound-sync.nix
+    ./vpn-sh.nix
     ./wgrouter.nix
   ];
 
@@ -466,6 +467,12 @@ in {
               type = types.listOf types.str;
               example = ["10.2.0.1"];
               description = "dns servers for vpn clients";
+            };
+            configFile = mkOption {
+              type = types.nullOr types.str;
+              example = "/etc/wg/wg0.conf";
+              description = "path to wireguard config file. Default is /etc/router/NAMESPACE/wg.conf";
+              default = null;
             };
           };
         });

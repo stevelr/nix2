@@ -6,13 +6,20 @@
 # (1) Add vpn definition to  my.config.vpnNamespaces. The attribute name is the namespace name.
 # (2) For each vpn, store config file (with private key) at /etc/router/${ns}/wg.conf (on the host)
 # (3) For each container to route through the vpn, set my.config.container.<name>.namespace= ns-name,
-#     and append (// vpnContainerConfig cfg)  to the container configuration
+#     and surround container def like this:
+#     let
+#        cfg = config.my.containers."my-container";
+#     in
+#     containers."my-container" = lib.recursiveUpdate {
+#          config = { ... }
+#     }
+#     (vpnContainerConfig config.my.vpnNamespaces.${cfg.namespace}));
 # (4) on host, set boot.kernel.sysctl = { "net.ipv4.ip_forward" = 1; };
 #
 # currently supports ipv4 only
 #
 # TODO: add health check for vpn
-#
+# TODO: don't have network connectivity from host, for example, if container runs sshd, can't ssh to it. Needs debugging. OTOH, lack of network connectivity is good because we know there are no leaks
 {
   config,
   lib,
@@ -22,7 +29,8 @@
 # Any host that runs vpn must set
 let
   inherit (builtins) filter;
-  inherit (lib) attrsToList listToAttrs attrValues;
+  inherit (lib) listToAttrs attrValues;
+  inherit (pkgs.myLib) valueOr;
 
   # program bin shorthand
   ip = "${pkgs.iproute}/bin/ip";
@@ -34,6 +42,7 @@ let
   # systemd.services."wgnet-${ns}" =
   mkWgNsService = cfg: let
     ns = cfg.name;
+    configFile = valueOr cfg.configFile "/etc/router/${ns}/wg.conf"; # path to wireguard config
   in {
     description = "wireguard network in namespace ${ns}";
     wants = ["network-online.target" "nss-lookup.target"];
@@ -45,11 +54,15 @@ let
     serviceConfig = {
       Type = "oneshot";
       RemainAfterExit = true;
+
       ExecStart = let
         start = pkgs.writeShellScript "wgnet-${ns}-up" ''
           # create container namespace, veth bridge, and start wireguard
           set -x
-
+          if [ ! -r "${configFile}" ]; then
+            echo "wireguard config file missing: '${configFile}'"
+            exit 10
+          fi
           # create namespace
           ${ip} netns add ${ns}
 
@@ -62,21 +75,21 @@ let
           ${ip} link add ve-${ns} type veth peer name eth-lan-${ns} # create peers
           ${ip} link set eth-lan-${ns} netns ${ns}                  # move eth-lan-NS into ns
           ${ip} -n ${ns} link set dev eth-lan-${ns} name eth-lan    # rename without suffix inside ctr
-          ${ip} addr add ${cfg.veHostIp4}/32 dev ve-${ns}               # set ip addr for host peer
-          ${ip} -n ${ns} addr add ${cfg.veNsIp4}/32 dev eth-lan         # set ip addr for container peer
+          ${ip} addr add ${cfg.veHostIp4}/32 dev ve-${ns}           # set ip addr for host peer
+          ${ip} -n ${ns} addr add ${cfg.veNsIp4}/32 dev eth-lan     # set ip addr for container peer
           ${ip} link set ve-${ns} up                                # start host peer
           ${ip} -n ${ns} link set eth-lan up                        # start container peer
-          ${ip} route add ${cfg.veNsIp4}/32 dev ve-${ns}                # route host to container peer
-          ${ip} -n ${ns} route add ${cfg.veHostIp4}/32 dev eth-lan      # route container to host peer
+          ${ip} route add ${cfg.veNsIp4}/32 dev ve-${ns}            # route host to container peer
+          ${ip} -n ${ns} route add ${cfg.veHostIp4}/32 dev eth-lan  # route container to host peer
 
-          # add nat rules on host
+          # add nat rules on host - for forwarding host ports into container
           # __Note__: if these are re-enabled, don't forget to uncomment the related line in ExecStopPost
-          #${nft} add table inet wgNat${ns}
-          #${nft} add chain inet wgNat${ns} postrouting \{ type nat hook postrouting priority 100 \; policy accept \; \}
-          #${nft} add rule  inet wgNat${ns} postrouting handle 0 iifname ${cfg.lanIface} oifname ve-${ns} masquerade
+          #${nft} add table inet wgnat-${ns}
+          #${nft} add chain inet wgnat-${ns} postrouting \{ type nat hook postrouting priority 100 \; policy accept \; \}
+          #${nft} add rule  inet wgnat-${ns} postrouting handle 0 iifname ${cfg.lanIface} oifname ve-${ns} masquerade
           # chain for port forwarding and and rule to handle http in container
-          #${nft} add chain inet wgNat${ns} prerouting \{ type nat hook prerouting priority -100 \; policy accept \; \}
-          #${nft} add rule  inet wgNat${ns} prerouting handle 0 iifname ${cfg.lanIface} tcp dport http dnat ip to ${cfg.veNsIp4}
+          #${nft} add chain inet wgnat-${ns} prerouting \{ type nat hook prerouting priority -100 \; policy accept \; \}
+          #${nft} add rule  inet wgnat-${ns} prerouting handle 0 iifname ${cfg.lanIface} tcp dport http dnat ip to ${cfg.veNsIp4}
 
           # create wireguard connection (ipv4 only for now) and move into container as 'wg0'
           ${ip} link add wg-${ns} type wireguard
@@ -84,15 +97,15 @@ let
           ${ip} -n ${ns} link set dev wg-${ns} name wg0
           ${ip} -n ${ns} addr add ${cfg.wgIp4} dev wg0
           ##${ip} -n ${ns} -6 addr add $IPV6 dev wg0
-          ${ip} netns exec ${ns} ${wg} setconf wg0 "/etc/router/${ns}/wg.conf"; # wireguard config
+          ${ip} netns exec ${ns} ${wg} setconf wg0 "${configFile}"
           ${ip} -n ${ns} link set wg0 up
           # set default route in container through wireguard tunnel
           # this also routes dns lookups on 10.2.0.1
-          ${ip} -n ${ns} route add default dev wg0
+          ${ip} -n ${ns} route add default via ${cfg.wgIp4} dev wg0
           ##${ip} -n ${ns} -6 route add default dev wg0
 
           # initialize nftables in container namespace
-          # Running this here instead of in connector.networking.nftables
+          # Running this here instead of in container.networking.nftables
           # so that we don't need to give container cap NET_ADMIN.
           ${ip} netns exec ${ns} ${nft} -f - <<_NFT
             table inet wgnat-internal {
@@ -136,7 +149,8 @@ let
           ${ip} -n ${ns} link del wg0
           # remove nat rules
           # __Note__: disabled becuase table creation is commented in ExecStart above
-          #${nft} delete table inet wgNat${ns} || true
+          ${nft} delete table inet wgnat-${ns} || true
+
           # remove veth peers and lo
           ${ip} -n ${ns} link del eth-lan
           ${ip} link del ve-${ns}

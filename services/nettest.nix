@@ -16,10 +16,9 @@ in {
     nettest =
       recursiveUpdate {
         autoStart = true;
-        #privateNetwork = true;
         ephemeral = true;
-        hostBridge = bridgeCfg.name;
-        localAddress = "${cfg.address}/${toString bridgeCfg.prefixLen}";
+        #hostBridge = bridgeCfg.name;
+        #localAddress = "${cfg.address}/${toString bridgeCfg.prefixLen}";
 
         config = {
           environment.systemPackages = with pkgs;
@@ -32,12 +31,12 @@ in {
             ++ (import ../modules/handy-tools.nix {inherit pkgs;}).full;
 
           services.resolved.enable = false;
+          #networking = myLib.netDefaults cfg bridgeCfg;
 
           users.users.user = {
             uid = 1000;
             group = "users";
             isNormalUser = true;
-            #packages = [ ];
           };
 
           environment.variables.TZ = config.my.containerCommon.timezone;

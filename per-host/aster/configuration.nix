@@ -31,6 +31,7 @@ in {
         # enp0s1
         "aster-lan0" = {
           name = "lan0";
+          localDev = "enp0s1";
           domain = "pasilla.net";
           gateway = "10.135.1.1";
         };
@@ -59,7 +60,7 @@ in {
         ns101 = {
           name = "ns101";
           enable = true;
-          lanIface = "eth0";
+          lanIface = "enp0s1"; # only used for port forwarding
           veNsIp4 = "192.168.10.11";
           veHostIp4 = "192.168.10.10";
           wgIp4 = "10.2.0.2"; # local (vpn client) interface addr in wg tunnel
@@ -112,6 +113,13 @@ in {
           bridge = "container-br0";
           address = "10.55.0.20";
           namespace = "ns101"; # make it run inside this vpn namespace
+        };
+
+        "vpn-sh" = {
+          enable = true;
+          name = "vpn-sh";
+          bridge = "container-br0";
+          namespace = "ns101";
         };
 
         gitea = {
