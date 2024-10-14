@@ -20,5 +20,5 @@ b:
 
 aster:
     #sudo nixos-rebuild switch --flake .#aster
-    sudo nixos-rebuild switch --flake .#aster --show-trace
+    sudo nixos-rebuild --cores 4 switch --flake .#aster --show-trace
 

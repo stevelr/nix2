@@ -125,16 +125,16 @@ let
 
               chain input {
                 # Drop everything by default
-                type filter hook input priority filter; policy drop;
-
+                type filter hook input priority -1; policy drop;
+                ct state established,related accept
                 iif lo accept
-                # enable ssh. This should be covered by the eth-lan rule below but this is a safeguard to prevent accidental blocks
-                tcp dport 22 accept
                 iifname "eth-lan" accept comment "Accept all packets coming from lan (or host)"
 
                 # this rule unused because we don't have any services available over wg tunnel
                 #iifname "wg0" tcp dport { 1111, 2222 } accept comment "Accept specific ports coming from Wireguard"
-                ct state established,related accept
+
+                icmp type echo-request accept  # ping
+                icmpv6 type != { nd-redirect, 139 } accept comment "Accept all ICMPv6 messages except redirects and node information queries (type 139).  See RFC 4890, section 4.4."
 
                 iif != lo ip daddr 127.0.0.1/8 counter drop comment "drop connections to loopback not coming from loopback"
               }

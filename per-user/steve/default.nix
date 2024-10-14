@@ -112,6 +112,7 @@ in {
         h = "hostname";
         j = "just";
         jwt-decode = "step crypto jwt inspect --insecure";
+        msh = "sudo machinectl shell";
         wkeys = "wezterm show-keys --lua"; # wezterm key mapping
       }
       # mac-specific aliases

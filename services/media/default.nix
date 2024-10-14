@@ -8,6 +8,8 @@
   inherit (lib.attrsets) recursiveUpdate;
   inherit (lib) concatStringsSep;
 
+  # TODO nft add rule inet nixos-fw input-allow tcp dport 443 accept
+
   namespace = "ns101";
   vpnCfg = config.my.vpnNamespaces.${namespace};
   mediaStorage = "/media";
@@ -65,13 +67,18 @@ in {
           environment.systemPackages = with pkgs; [
             bind.dnsutils
             jq
+            lsof
             nmap
             helix
           ];
           networking = {
-            nftables.enable = true;
-            firewall.enable = false;
-            firewall.allowedTCPPorts = [80 443];
+            nftables = {
+              enable = true;
+            };
+            firewall = {
+              enable = true;
+              allowedTCPPorts = [80 443];
+            };
             extraHosts = ''
               127.0.0.1 jellyfin jellyfin.${urlDomain}
               127.0.0.1 sonarr sonarr.${urlDomain}
@@ -88,6 +95,10 @@ in {
               "nginx"
             ]
             ++ backends);
+
+          services.openssh = {
+            enable = true;
+          };
 
           services.jellyfin = let
             name = "jellyfin";
