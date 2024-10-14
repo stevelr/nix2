@@ -79,8 +79,8 @@ let
           ${ip} -n ${ns} addr add ${cfg.veNsIp4}/32 dev eth-lan     # set ip addr for container peer
           ${ip} link set ve-${ns} up                                # start host peer
           ${ip} -n ${ns} link set eth-lan up                        # start container peer
-          ${ip} route add ${cfg.veNsIp4}/32 dev ve-${ns}            # route host to container peer
-          ${ip} -n ${ns} route add ${cfg.veHostIp4}/32 dev eth-lan  # route container to host peer
+          ${ip} route add ${cfg.veNsIp4}/32 dev ve-${ns} src ${cfg.veHostIp4} # route host to container peer
+          ${ip} -n ${ns} route add ${cfg.veHostIp4}/32 dev eth-lan src ${cfg.veNsIp4} # route container to host peer
 
           # add nat rules on host - for forwarding host ports into container
           # __Note__: if these are re-enabled, don't forget to uncomment the related line in ExecStopPost

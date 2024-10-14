@@ -31,7 +31,21 @@ in {
             ++ (import ../modules/handy-tools.nix {inherit pkgs;}).full;
 
           services.resolved.enable = false;
-          #networking = myLib.netDefaults cfg bridgeCfg;
+          services.openssh = {
+            enable = true;
+            listenAddresses = [
+              {
+                addr = "192.168.10.11";
+                port = 22;
+              }
+            ];
+            settings = {
+              PermitRootLogin = "no";
+              X11Forwarding = true;
+            };
+            #startWhenNeeded = true;
+          };
+          networking.nftables.enable = true;
 
           users.users.user = {
             uid = 1000;
