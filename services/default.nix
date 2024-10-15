@@ -1,4 +1,4 @@
-#
+# services/default.nix
 {
   config,
   pkgs,
@@ -8,8 +8,6 @@
   inherit (builtins) isNull;
   inherit (lib) mkOption mkEnableOption types;
   inherit (pkgs.myLib) valueOr;
-
-  media-group-gid = 4502;
 
   # extract first three octets of ipv4 addr  "10.11.12.13" -> "10.11.12"
   first24 = addr: builtins.head (builtins.head (builtins.tail (builtins.split "([0-9]+\.[0-9]+\.[0-9]+)\.[0-9]+" addr)));
@@ -649,7 +647,7 @@ in {
       jellyfin = {
         uid = 4100;
         gid = 4100;
-        extraGroups = ["media-group"];
+        extraGroups = ["media-group" "render" "video"];
       };
       sonarr = {
         uid = 4101;
@@ -661,12 +659,17 @@ in {
         gid = 4102;
         extraGroups = ["media-group"];
       };
+      qbittorrent = {
+        uid = 4103;
+        gid = 4103;
+        extraGroups = ["media-group"];
+      };
 
       # developer group
       developer = {gid = 4500;};
       # prometheus exporters
       exporters = {gid = 4501;};
-      media-group = {gid = media-group-gid;};
+      media-group = {gid = 4502;};
     };
 
     # service ports
@@ -703,6 +706,7 @@ in {
       readarr = {port = 8787;};
       lidarr = {port = 8686;};
       bazarr = {port = 6767;};
+      qbittorrent = {port = 11001;};
     };
 
     my.containerCommon.timezone = "Etc/UTC";

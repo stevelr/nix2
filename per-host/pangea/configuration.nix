@@ -612,19 +612,15 @@ in {
     # set host to same UTC timezone as containeres
     time.timeZone = config.my.containerCommon.timezone;
 
-    networking.timeServers = [
-      # using ip adddresses because for kea option-data.ntp-servers needs ip addresses.
-      # TODO: figure out how to make it dynamic - perhaps at container boot time?
-      "23.186.168.1"
-      "72.14.183.39"
-      "23.150.41.123"
-      "23.150.40.242"
-      "162.159.200.1"
-      #"0.us.pool.ntp.org"
-      #"1.us.pool.ntp.org"
-      #"2.us.pool.ntp.org"
-      #"3.us.pool.ntp.org"
-    ];
+    services.ntp = {
+      enable = true;
+      servers = [
+        "0.us.pool.ntp.org"
+        "1.us.pool.ntp.org"
+        "2.us.pool.ntp.org"
+        "3.us.pool.ntp.org"
+      ];
+    };
 
     boot = {
       tmp = {

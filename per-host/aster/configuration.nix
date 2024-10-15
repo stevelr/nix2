@@ -1,21 +1,21 @@
-# Edit this configuration file to define what should be installed on
-# your system.  Help is available in the configuration.nix(5) man page
-# and in the NixOS manual (accessible by running ‘nixos-help’).
+# per-host/aster/configuration.nix
+#
 {
   config,
   pkgs,
   lib,
   ...
 }: let
-  inherit (lib) optionalString;
-
   mkUsers = pkgs.myLib.mkUsers config.my.userids;
   mkGroups = pkgs.myLib.mkGroups config.my.userids;
   nginxIP = "10.55.0.15";
-  #containerNet = "10.55.0.0/24";
+  mediaIP = "192.168.10.11";
+  # where to forward incoming http traffic - either nginxIP or mediaIP
+  activeHttp = mediaIP;
+  hostDomain = "pasilla.net";
+  fqdn = "aster.pasilla.net";
 in {
   imports = [
-    # Include the results of the hardware scan.
     ../../services
     ./hardware-configuration.nix
   ];
@@ -23,7 +23,7 @@ in {
   config = {
     my = {
       hostName = "aster";
-      hostDomain = "pasilla.net";
+      hostDomain = hostDomain;
       localDomain = "pnet";
 
       # later converted to my.subnets
@@ -32,7 +32,7 @@ in {
         "aster-lan0" = {
           name = "lan0";
           localDev = "enp0s1";
-          domain = "pasilla.net";
+          domain = hostDomain;
           gateway = "10.135.1.1";
         };
 
@@ -40,7 +40,7 @@ in {
         "container-br0" = {
           name = "br0";
           gateway = "10.55.0.1";
-          domain = "aster.pasilla.net";
+          domain = fqdn;
           dhcp.enable = true;
         };
       };
@@ -69,50 +69,30 @@ in {
       };
 
       containers = {
-        nginx = let
-          subdomain = "aster.pasilla.net";
-        in {
-          enable = true;
+        #
+        nginx = {
+          # it doesn't make sense to run nginx if we are also running media container
+          enable = activeHttp == nginxIP;
           name = "nginx";
           bridge = "container-br0";
           address = nginxIP;
           settings = {
-            subdomain = subdomain;
+            subdomain = fqdn;
 
             # list of containers that we proxy
             # don't include vault if we want vault to terminate tls
             backends = [];
 
-            # [ss] is this used?
-            # www = {
-            #   enable = false;
-            # };
-
-            # [ss] what is this ssl section for?
-            # ssl = {
-            #   enable = false;
-            #   hostPath = "";
-            #   localPath = "";
-            # };
-
             # bindmounts for certificates
             mounts = let
               # on aster, we have wildcard cert for all virtual hosts,
               # i.e., aster.pasilla.net and *.aster.pasilla.net
-              wildcardCertPath = {hostPath = "/root/certs/${subdomain}";};
+              wildcardCertPath = {hostPath = "/root/certs/${fqdn}";};
             in {
-              "/var/local/www" = {hostPath = "/var/lib/www/${subdomain}";};
-              "/etc/ssl/nginx/${subdomain}" = wildcardCertPath;
+              "/var/local/www" = {hostPath = "/var/lib/www/${fqdn}";};
+              "/etc/ssl/nginx/${fqdn}" = wildcardCertPath;
             };
           };
-        };
-
-        nettest = {
-          enable = true;
-          name = "nettest";
-          bridge = "container-br0";
-          address = "10.55.0.20";
-          namespace = "ns101"; # make it run inside this vpn namespace
         };
 
         media = {
@@ -123,6 +103,16 @@ in {
           namespace = "ns101";
         };
 
+        # nettest is used here for manual vpn testing
+        nettest = {
+          enable = true;
+          name = "nettest";
+          bridge = "container-br0";
+          address = "10.55.0.20";
+          namespace = "ns101"; # make it run inside this vpn namespace
+        };
+
+        # used for manual testing
         "vpn-sh" = {
           enable = true;
           name = "vpn-sh";
@@ -130,43 +120,48 @@ in {
           namespace = "ns101";
         };
 
-        gitea = {
-          enable = false;
-          name = "gitea";
-          bridge = "container-br0";
-          address = "10.55.0.16";
-          proxyPort = 3000;
-          settings = {
-            ssh = 3022;
-            hostSsh = 3022;
-          };
-        };
-
-        vault = {
+        # hashicorp vault for secrets
+        vault = let
+          apiPort = config.my.ports.vault.port;
+          clusterPort = config.my.ports.vaultCluster.port;
+        in {
           enable = true;
           name = "vault";
           bridge = "container-br0";
           address = "10.55.0.17";
-          proxyPort = config.my.ports.vault.port;
+          proxyPort = apiPort;
           settings = {
+            inherit apiPort clusterPort;
             enable = true;
-            apiPort = config.my.ports.vault.port;
             uiEnable = true;
             tls = {
               enable = true;
-              chain = "/root/certs/vault.aster.pasilla.net/fullchain1.pem";
-              privkey = "/root/certs/vault.aster.pasilla.net/privkey1.pem";
+              chain = "/root/certs/vault.${fqdn}/fullchain1.pem";
+              privkey = "/root/certs/vault.${fqdn}/privkey1.pem";
             };
-            clusterPort = 8201;
-            clusterName = "aster.pasilla.net";
+            clusterName = fqdn;
             # external api address
-            apiAddr = "https://vault.aster.pasilla.net:8200";
+            apiAddr = "https://vault.${fqdn}:${toString apiPort}";
             # external cluster address
-            clusterAddr = "vault.aster.pasilla.net:8201";
+            clusterAddr = "vault.${fqdn}:${toString clusterPort}";
             # server log level: trace,debug,info.warn,err
             logLevel = "info"; #
             storagePath = "/var/lib/vault";
           };
+        };
+      };
+
+      # media server configuration
+      media = {
+        enable = true;
+        namespace = "ns101";
+        container = "media"; # reference media container above
+        urlDomain = fqdn;
+        backends = ["jellyfin" "sonarr" "radarr" "qbittorrent"];
+        staticSite = "/var/lib/media/www";
+        storage = {
+          hostBase = "/var/lib/media";
+          localBase = "/media";
         };
       };
     };
@@ -261,27 +256,13 @@ in {
     # Enable touchpad support (enabled default in most desktopManager).
     # services.xserver.libinput.enable = true;
 
-    # Define a user account. Don't forget to set a password with ‘passwd’.
     users.users = lib.recursiveUpdate (mkUsers []) {
       steve = {
-        #uid = config.my.userids.steve.uid;
-        #isNormalUser = true;
-        #description = "Steve";
         group = "users";
         extraGroups = ["networkmanager" "wheel" "audio" "video"];
-        #shell = "${pkgs.zsh}/bin/zsh";
       };
-      # vault = {
-      #   isSystemUser = true;
-      #   uid = config.my.userids.vault.uid;
-      #   group = "vault";
-      # };
     };
     users.groups = mkGroups [];
-    # {
-    #   exporters.gid = config.my.userids.exporters.gid;
-    #   vault.gid = config.my.userids.vault.gid;
-    # };
 
     programs.firefox.enable = true;
     programs.zsh.enable = true;
@@ -335,8 +316,12 @@ in {
       hostName = "aster"; # Define your hostname.
       wireless.enable = false;
       extraHosts = ''
-        ${nginxIP} aster.pasilla.net
-        ${nginxIP} vault.aster.pasilla.net
+        ${nginxIP} ${fqdn}
+        ${nginxIP} vault vault.${fqdn}
+        ${mediaIP} jellyfin jellyfin.${fqdn}
+        ${mediaIP} qbittorrent qbittorrent.${fqdn}
+        ${mediaIP} sonarr sonarr.${fqdn}
+        ${mediaIP} radarr radarr.${fqdn}
       '';
 
       useNetworkd = true;
@@ -350,41 +335,10 @@ in {
           ++ (lib.optionals config.my.services.tailscale.enable [config.my.ports.tailscale.port])
           ++ (lib.optionals config.my.containers.vault.enable [config.my.ports.vault.port config.my.ports.vaultCluster.port]);
       };
+
       nftables = {
         enable = true;
         checkRuleset = true;
-        # tables.host = {
-        #   name = "host";
-        #   family = "inet";
-        #   content = ''
-        #     chain input {
-        #       # priority -20 to run before default input chain at priority 0 ("filter")
-        #       type filter hook input priority -20; policy drop;
-        #       iif "lo" accept
-        #       ct state invalid drop
-        #       ct state { established, related } counter packets 0 bytes 0 accept
-
-        #       # any forwardPorts defined in nspawn containers are forwarded by dnat rules
-        #       # in tables (ip io.systemd.nat) and (ip6 io.systemd.nat) created by systemd.
-        #       # Those ports need to be accepted here at priority 0.
-        #       tcp dport { ssh, http, https, \
-        #           ${toString config.my.ports.nats.port}, \
-        #           ${toString config.my.ports.vault.port}, \
-        #           ${toString config.my.ports.vaultCluster.port}, \
-        #           } accept
-
-        #       # tailscale, if enabled
-        #       ${optionalString config.my.services.tailscale.enable "udp dport ${toString config.my.ports.tailscale.port}"}
-
-        #       # allow dhcp and icmp
-        #       udp dport { 67,68 }                    accept comment "dhcp"
-        #       ip protocol 1                          accept comment "icmp"
-        #       meta l4proto 58                        accept comment "icmpv6"
-
-        #       # everything else dropped
-        #     }
-        #   '';
-        # };
 
         tables."container-fwd" = {
           name = "container-fwd";
@@ -393,15 +347,18 @@ in {
           content = ''
             chain pre {
               type nat hook prerouting priority -100;
-              # forward incoming http,https to nginx
-              tcp dport {80,443} dnat to ${nginxIP}
+
+              # forward incoming http,https to nginx or media container
+              tcp dport {80,443} dnat to ${activeHttp}
             }
             chain post {
               type nat hook postrouting priority srcnat; policy accept;
-              # from containers to WAN
+
+              # from trusted containers to WAN
               ip saddr 10.55.0.0/24 ip daddr != 10.55.0.0/24 masquerade
+
               # http,https from wan to nginx
-              ip daddr ${nginxIP} masquerade
+              ip daddr ${activeHttp} masquerade
             }
           '';
         };

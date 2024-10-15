@@ -139,12 +139,6 @@
               option edns0
               ${nameservers}
             '';
-          # config.networking.useHostResolvConf = lib.mkForce false;
-          # config.networking.resolvconf.enable = false;
-          # config.networking.nameservers = cfg.vpnDns;
-          # config.networking.useNetworkd = true;
-          # config.networking.firewall.enable = false;
-          # config.networking.nftables.enable = true;
         };
 
         # # Merges list of records, concatenates arrays, if two values can't be merged - the latter is preferred
