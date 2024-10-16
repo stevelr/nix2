@@ -6,8 +6,7 @@
   lib,
   ...
 }: let
-  mkUsers = pkgs.myLib.mkUsers config.my.userids;
-  mkGroups = pkgs.myLib.mkGroups config.my.userids;
+  inherit (pkgs.myLib) mkUsers mkGroups;
   nginxIP = "10.55.0.15";
   mediaIP = "192.168.10.11";
   # where to forward incoming http traffic - either nginxIP or mediaIP
@@ -157,11 +156,24 @@ in {
         namespace = "ns101";
         container = "media"; # reference media container above
         urlDomain = fqdn;
-        backends = ["jellyfin" "sonarr" "radarr" "qbittorrent"];
+        backends = ["jellyfin" "sonarr" "radarr" "jackett" "prowlarr" "qbittorrent" "audiobookshelf"];
         staticSite = "/var/lib/media/www";
+        mediaUserExtraConfig = {
+          # groups should include 'wheel' if sudo is enabled
+          extraGroups = ["media-group" "wheel" "video" "render"];
+          packages = with pkgs; [curl jq helix python3];
+          openssh.authorizedKeys.keys = [
+            "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFilbUTPgUrnInm3Nz2U0rE5oUCzx4uFgwGJYjZwmhpN user@aster"
+          ];
+        };
         storage = {
           hostBase = "/var/lib/media";
           localBase = "/media";
+        };
+        # security.sudo settings
+        sudo = {
+          enable = true;
+          execWheelOnly = true;
         };
       };
     };
@@ -256,13 +268,13 @@ in {
     # Enable touchpad support (enabled default in most desktopManager).
     # services.xserver.libinput.enable = true;
 
-    users.users = lib.recursiveUpdate (mkUsers []) {
+    users.users = lib.recursiveUpdate (mkUsers config.my.userids ["steve" "media" "nginx"]) {
       steve = {
         group = "users";
         extraGroups = ["networkmanager" "wheel" "audio" "video"];
       };
     };
-    users.groups = mkGroups [];
+    users.groups = mkGroups config.my.userids ["exporters" "media" "nginx" "media-group"];
 
     programs.firefox.enable = true;
     programs.zsh.enable = true;
@@ -317,11 +329,13 @@ in {
       wireless.enable = false;
       extraHosts = ''
         ${nginxIP} ${fqdn}
-        ${nginxIP} vault vault.${fqdn}
-        ${mediaIP} jellyfin jellyfin.${fqdn}
-        ${mediaIP} qbittorrent qbittorrent.${fqdn}
-        ${mediaIP} sonarr sonarr.${fqdn}
-        ${mediaIP} radarr radarr.${fqdn}
+        ${nginxIP} vault.${fqdn}
+        ${mediaIP} jellyfin.${fqdn}
+        ${mediaIP} qbittorrent.${fqdn}
+        ${mediaIP} sonarr.${fqdn}
+        ${mediaIP} radarr.${fqdn}
+        ${mediaIP} jackett.${fqdn}
+        ${mediaIP} prowlarr.${fqdn}
       '';
 
       useNetworkd = true;

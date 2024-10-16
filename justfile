@@ -20,5 +20,8 @@ b:
 
 aster:
     #sudo nixos-rebuild switch --flake .#aster
-    sudo nixos-rebuild --cores 4 switch --flake .#aster --show-trace
+    sudo nixos-rebuild --refresh --cores 4 switch --flake .#aster --show-trace
 
+mboot:
+    sudo systemctl restart container@media.service
+    sudo machinectl shell media

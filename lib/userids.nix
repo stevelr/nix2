@@ -14,7 +14,6 @@ in {
   # setup a new ZFS dataset for their home, and then run, as the user,
   # `/etc/nixos/users/setup-home`.
   #
-  # Per-host users should instead be defined in `per-host/$HOSTNAME/default.nix`.
   mkUsers = userids: users: (lib.listToAttrs (
     map
     (x: {
@@ -37,7 +36,8 @@ in {
         })
         // (lib.optionalAttrs (!isNull x.value.extraGroups) {
           extraGroups = x.value.extraGroups;
-        });
+        })
+        // (lib.optionalAttrs (!isNull x.value.extraConfig) x.value.extraConfig);
     })
     (
       lib.filter

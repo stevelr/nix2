@@ -1,27 +1,38 @@
 # services/media/default.nix
 #
 # TODO: test jellyfin gpu configuration
+# TODO: health check and recovery services
+#       (1) health check - either as separate service or ExecStartPost with systemd-notify and watchdog timer
+#       (2) recovery service as in https://www.redhat.com/sysadmin/systemd-automate-recovery
 {
   config,
   pkgs,
   lib,
   ...
 }: let
-  inherit (pkgs.myLib) mkUsers mkGroups;
   inherit (lib) concatMapStrings concatStringsSep types mkOption;
   inherit (builtins) elem;
 
+  mkUsers = pkgs.myLib.mkUsers config.my.userids;
+  mkGroups = pkgs.myLib.mkGroups config.my.userids;
+
   cfg = config.my.media;
 
-  dataDir = s: "${cfg.storage.localBase}/data/${s}";
+  #dataDir = s: "${cfg.storage.localBase}/data/${s}";
 
-  mkQbittorrent = (import ./qbittorrent.nix {inherit pkgs config;}).mkQbittorrentService;
-  mkJellyfin = (import ./jellyfin.nix {inherit pkgs config;}).mkJellyfinService;
-
-  # TODO: resolver?
-  #resolver             ${bridgeCfg.gateway};
+  qbittorrent = (import ./qbittorrent.nix {inherit pkgs config;}).mkQbittorrentService cfg;
+  jellyfin = (import ./jellyfin.nix {inherit pkgs config;}).mkJellyfinService cfg;
+  sonarr = (import ./sonarr.nix {inherit pkgs config;}).mkSonarrService cfg;
+  radarr = (import ./radarr.nix {inherit pkgs config;}).mkRadarrService cfg;
+  jackett = (import ./jackett.nix {inherit pkgs config;}).mkJackettService cfg;
+  prowlarr = (import ./prowlarr.nix {inherit pkgs config;}).mkProwlarrService cfg;
 
   # nginx template for backend service
+  # defaults includes
+  #      proxy_http_version      1.1;
+  #      proxy_set_header        Upgrade $http_upgrade;   # for websockets
+  #      proxy_set_header        Connection "upgrade";    # for websockets
+
   serverConfig = name: ''
     server {
       listen                    80;
@@ -32,9 +43,13 @@
       listen                    443 ssl;
       http2                     on;
       server_name               ${name}.${cfg.urlDomain};
+      access_log                "${cfg.storage.localBase}/log/nginx/${name}.access.log";
+      error_log                 "${cfg.storage.localBase}/log/nginx/${name}.error.log";
       location / {
         proxy_pass              http://127.0.0.1:${toString config.my.ports.${name}.port};
-        proxy_set_header        Host $host;  # was $server_name
+        proxy_set_header        Host $host;
+        proxy_set_header        X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header        X-Forwarded-Proto $scheme;
       }
     }
   '';
@@ -91,8 +106,13 @@ in {
         backends = mkOption {
           type = types.listOf types.str;
           description = "backend services within container";
-          default = [];
-          example = ["jellyfin"];
+          default = ["jellyfin"];
+        };
+        mediaUserExtraConfig = mkOption {
+          type = types.nullOr (types.attrsOf types.anything);
+          description = "additional config for users.users.media";
+          default = null;
+          example = {packages = [pkgs.hello];};
         };
         storage = mkOption {
           type = types.submodule {
@@ -115,6 +135,11 @@ in {
             };
           };
         };
+        sudo = mkOption {
+          type = types.nullOr (types.attrsOf types.anything);
+          description = "sudo options";
+          default = null;
+        };
       };
     });
     default = null;
@@ -128,15 +153,18 @@ in {
       extraFlags = ["--network-namespace-path=/run/netns/${cfg.namespace}"];
       enableTun = true;
       bindMounts = {
-        "${cfg.storage.localBase}" = {
-          hostPath = cfg.storage.hostBase;
+        media = {
+          mountPoint = "${cfg.storage.localBase}";
+          hostPath = "${cfg.storage.hostBase}";
           isReadOnly = false;
         };
-        "/etc/ssl/nginx" = {
+        certs = {
+          mountPoint = "/etc/ssl/nginx";
           hostPath = "/root/certs/aster.pasilla.net";
+          isReadOnly = true;
         };
-        # gpu
-        "/dev/dri/renderD128" = {
+        gpu = {
+          mountPoint = "/dev/dri/renderD128";
           hostPath = "/dev/dri/renderD128";
           isReadOnly = false;
         };
@@ -144,18 +172,13 @@ in {
 
       config = {
         environment.systemPackages = with pkgs; [
+          bash
           bind.dnsutils
           jq
           lsof
           nmap
           helix
         ];
-        # these didn't get set
-        # environment.variables = {
-        #   XDG_DATA_HOME = "${cfg.storage.localBase}/data";
-        #   XDG_CONFIG_HOME = "${cfg.storage.localBase}/config";
-        #   XDG_CACHE_HOME = "${cfg.storage.localBase}/cache";
-        # };
         networking = {
           nftables = {
             enable = true;
@@ -170,43 +193,39 @@ in {
             (map (s: "127.0.0.1 ${s} ${s}.${cfg.urlDomain}") cfg.backends);
         };
 
-        # create users. Each backend runs as its own userid
-        # and is also a member of "media-group"
-        users.users = mkUsers config.my.userids ([
-            "nginx"
-          ]
-          ++ cfg.backends);
-        users.groups = mkGroups config.my.userids ([
+        # Create users and groups. Each backend service runs with its own unique userid.
+        # All backend services share the same group "media-group", which makes it easier
+        # to manage files in the shared folders
+        users.users =
+          lib.recursiveUpdate
+          (mkUsers (cfg.backends ++ ["nginx" "media"])) {
+            media = cfg.mediaUserExtraConfig;
+            nginx = {extraGroups = ["media-group"];};
+          };
+        users.groups = mkGroups (cfg.backends
+          ++ [
             "media-group"
+            "media"
             "nginx"
-          ]
-          ++ cfg.backends);
+          ]);
+
+        systemd.services =
+          qbittorrent.services
+          // jellyfin.services
+          // sonarr.services
+          // radarr.services
+          // prowlarr.services
+          // jackett.services;
 
         services.openssh = {
           enable = true;
         };
 
-        services.sonarr = {
-          enable = elem "sonarr" cfg.backends;
-          user = "sonarr";
-          group = "sonarr";
-          dataDir = dataDir "sonarr";
-        };
-
-        services.radarr = {
-          enable = elem "radarr" cfg.backends;
-          user = "radarr";
-          group = "radarr";
-          dataDir = dataDir "radarr";
-        };
-
-        systemd.services.qbittorrent = mkQbittorrent cfg;
-        systemd.services.jellyfin = mkJellyfin cfg;
+        security.sudo = cfg.sudo;
+        programs.zsh.enable = true;
 
         services.nginx = {
           enable = true;
-          user = "nginx";
-          group = "nginx";
           validateConfigFile = true;
           recommendedGzipSettings = true;
           recommendedOptimisation = true;
@@ -214,6 +233,8 @@ in {
           recommendedProxySettings = true;
           serverTokens = false;
           sslProtocols = "TLSv1.3";
+          clientMaxBodySize = "10g"; # allow larger post sizes
+          statusPage = true; # enable http://127.0.0.1/nginx_status
 
           appendConfig = ''
             worker_processes 2;
@@ -299,6 +320,8 @@ in {
               <p><a href="https://jellyfin.${cfg.urlDomain}">jellyfin</a></p>
               <p><a href="https://sonarr.${cfg.urlDomain}">sonarr</a></p>
               <p><a href="https://radarr.${cfg.urlDomain}">radarr</a></p>
+              <p><a href="https://prowlarr.${cfg.urlDomain}">prowlarr</a></p>
+              <p><a href="https://jackett.${cfg.urlDomain}">jackett</a></p>
               <p><a href="https://qbittorrent.${cfg.urlDomain}">qbittorrent</a></p>
             </div>
           </body>

@@ -378,6 +378,12 @@ in {
               example = ["audio"];
               description = "optional list of additional groups for the user";
             };
+            extraConfig = mkOption {
+              type = types.nullOr (types.attrsOf types.anything);
+              default = null;
+              example = {packages = [pkgs.hello];};
+              description = "additional user attributes";
+            };
           };
         });
         description = "uid and gid settings for common users";
@@ -664,7 +670,17 @@ in {
         gid = 4103;
         extraGroups = ["media-group"];
       };
-
+      audiobookshelf = {
+        uid = 4104;
+        gid = 4104;
+        extraGroups = ["media-group"];
+      };
+      media = {
+        uid = 4105;
+        gid = 4105;
+        isInteractive = true;
+        extraGroups = ["media-group"];
+      };
       # developer group
       developer = {gid = 4500;};
       # prometheus exporters
@@ -703,10 +719,12 @@ in {
       radarr = {port = 7878;};
       sonarr = {port = 8989;};
       prowlarr = {port = 9696;};
-      readarr = {port = 8787;};
+      #readarr = {port = 8787;};
       lidarr = {port = 8686;};
       bazarr = {port = 6767;};
+      jackett = {port = 9117;};
       qbittorrent = {port = 11001;};
+      audiobookshelf = {port = 7008;};
     };
 
     my.containerCommon.timezone = "Etc/UTC";
