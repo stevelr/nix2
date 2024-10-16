@@ -11,7 +11,6 @@
   ...
 }: let
   inherit (lib) concatMapStrings concatStringsSep types mkOption;
-  inherit (builtins) elem;
 
   mkUsers = pkgs.myLib.mkUsers config.my.userids;
   mkGroups = pkgs.myLib.mkGroups config.my.userids;
@@ -43,8 +42,6 @@
       listen                    443 ssl;
       http2                     on;
       server_name               ${name}.${cfg.urlDomain};
-      access_log                "${cfg.storage.localBase}/log/nginx/${name}.access.log";
-      error_log                 "${cfg.storage.localBase}/log/nginx/${name}.error.log";
       location / {
         proxy_pass              http://127.0.0.1:${toString config.my.ports.${name}.port};
         proxy_set_header        Host $host;
@@ -253,7 +250,9 @@ in {
             ssl_trusted_certificate   /etc/ssl/nginx/chain1.pem;
 
             proxy_headers_hash_max_size 2048;
-            log_format myformat '$http_x_forwarded_for $remote_addr [$time_local] "$request" $status $body_bytes_sent "$http_referer" "$http_user_agent" $upstream_response_time';
+            log_format myformat       '$http_x_forwarded_for $remote_addr [$time_local] "$request" $status $body_bytes_sent "$http_referer" "$http_user_agent" $upstream_response_time';
+            access_log                /var/log/nginx/access.log myformat;
+            error_log                 /var/log/nginx/error.log warn;
           '';
 
           # generate server{} stanzas for each backend

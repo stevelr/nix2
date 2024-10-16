@@ -156,7 +156,7 @@ in {
         namespace = "ns101";
         container = "media"; # reference media container above
         urlDomain = fqdn;
-        backends = ["jellyfin" "sonarr" "radarr" "jackett" "prowlarr" "qbittorrent" "audiobookshelf"];
+        backends = ["jellyfin" "sonarr" "radarr" "qbittorrent" "audiobookshelf" "jackett" "prowlarr"];
         staticSite = "/var/lib/media/www";
         mediaUserExtraConfig = {
           # groups should include 'wheel' if sudo is enabled
@@ -339,7 +339,6 @@ in {
       '';
 
       useNetworkd = true;
-      #networkmanager.enable = false;
 
       firewall = {
         enable = true;

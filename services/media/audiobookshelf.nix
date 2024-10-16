@@ -8,7 +8,6 @@
     dataHome = "${cfg.storage.localBase}/data";
     cacheHome = "${cfg.storage.localBase}/cache";
     configHome = "${cfg.storage.localBase}/config";
-    logDir = "${cfg.storage.localBase}/log/sonarr";
   in {
     services = {
       audiobookshelf = {

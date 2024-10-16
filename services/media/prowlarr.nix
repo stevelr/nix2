@@ -48,9 +48,9 @@
             preStartScript = pkgs.writeScript "prowlarr-run-prestart" ''
               #!${pkgs.bash}/bin/bash
               # Create any essential directories if they don't exist
-              ${ensureDir "${dataHome}/prowlarr" "770"}
-              ${ensureDir "${cacheHome}/prowlarr" "700"}
-              ${ensureDir "${configHome}/prowlarr" "700"}
+              ${ensureDir "${dataHome}/Prowlarr" "770"}
+              ${ensureDir "${cacheHome}/Prowlarr" "700"}
+              ${ensureDir "${configHome}/Prowlarr" "700"}
             '';
           in "!${preStartScript}";
           ExecStart = "${pkgs.prowlarr}/bin/Prowlarr";

@@ -8,7 +8,6 @@
     dataHome = "${cfg.storage.localBase}/data";
     cacheHome = "${cfg.storage.localBase}/cache";
     configHome = "${cfg.storage.localBase}/config";
-    #logDir = "${cfg.storage.localBase}/log/jackett";
   in {
     services = {
       jackett = {
@@ -48,9 +47,9 @@
             preStartScript = pkgs.writeScript "jackett-run-prestart" ''
               #!${pkgs.bash}/bin/bash
               # Create any essential directories if they don't exist
-              ${ensureDir "${dataHome}/jackett" "770"}
-              ${ensureDir "${cacheHome}/jackett" "700"}
-              ${ensureDir "${configHome}/jackett" "700"}
+              ${ensureDir "${dataHome}/Jackett" "770"}
+              ${ensureDir "${cacheHome}/Jackett" "700"}
+              ${ensureDir "${configHome}/Jackett" "700"}
             '';
           in "!${preStartScript}";
           ExecStart = "${pkgs.jackett}/bin/jackett";

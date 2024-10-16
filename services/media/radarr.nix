@@ -49,9 +49,9 @@
             preStartScript = pkgs.writeScript "radarr-run-prestart" ''
               #!${pkgs.bash}/bin/bash
               # Create any essential directories if they don't exist
-              ${ensureDir "${dataHome}/radarr" "770"}
-              ${ensureDir "${cacheHome}/radarr" "700"}
-              ${ensureDir "${configHome}/radarr" "700"}
+              ${ensureDir "${dataHome}/Radarr" "770"}
+              ${ensureDir "${cacheHome}/Radarr" "700"}
+              ${ensureDir "${configHome}/Radarr" "700"}
             '';
           in "!${preStartScript}";
           ExecStart = "${pkgs.radarr}/bin/Radarr";

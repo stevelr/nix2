@@ -681,6 +681,16 @@ in {
         isInteractive = true;
         extraGroups = ["media-group"];
       };
+      jackett = {
+        uid = 4106;
+        gid = 4106;
+        extraGroups = ["media-group"];
+      };
+      prowlarr = {
+        uid = 4107;
+        gid = 4107;
+        extraGroups = ["media-group"];
+      };
       # developer group
       developer = {gid = 4500;};
       # prometheus exporters

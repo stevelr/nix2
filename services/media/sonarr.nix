@@ -59,9 +59,9 @@
             preStartScript = pkgs.writeScript "sonarr-run-prestart" ''
               #!${pkgs.bash}/bin/bash
               # Create any essential directories if they don't exist
-              ${ensureDir "${dataHome}/sonarr" "770"}
-              ${ensureDir "${cacheHome}/sonarr" "700"}
-              ${ensureDir "${configHome}/sonarr" "700"}
+              ${ensureDir "${dataHome}/Sonarr" "770"}
+              ${ensureDir "${cacheHome}/Sonarr" "700"}
+              ${ensureDir "${configHome}/Sonarr" "700"}
             '';
           in "!${preStartScript}";
           ExecStart = "${pkgs.sonarr}/bin/Sonarr";
