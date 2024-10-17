@@ -29,16 +29,11 @@
 
   outputs = {self, ...} @ inputs:
     with inputs; let
-      # Supported systems for your flake packages, shell, etc.
       supportedSystems = [
         "aarch64-linux"
         "x86_64-linux"
         "aarch64-darwin"
         #"x86_64-darwin"
-      ];
-
-      commonModules = [
-        ./modules/common.nix
       ];
 
       forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
@@ -48,6 +43,10 @@
           pkgs = inputs.nixpkgs.legacyPackages.${system};
           inherit system;
         });
+
+      commonModules = [
+        ./modules/common.nix
+      ];
 
       mkSystem = {
         system,
@@ -74,7 +73,6 @@
         system:
           with mkPkgsFor.${system}; {
             inherit hello-custom;
-            #backrest = pkgs.callPackage ./pkgs/backrest/backrest.nix {};
           }
       );
 
@@ -101,19 +99,13 @@
         home-manager = inputs.home-manager.darwinModules.home-manager;
       in {
         comet = inputs.nix-darwin.lib.darwinSystem {
-          specialArgs = {
-            hostname = "comet";
-          };
+          specialArgs = {};
           modules =
             [
               ./per-host/comet
               home-manager
               {
                 home-manager = {
-                  extraSpecialArgs = {
-                    hostname = "comet";
-                    username = "steve";
-                  };
                   useGlobalPkgs = true;
                   useUserPackages = true;
                   users."steve" = import ./per-user/steve;
@@ -150,7 +142,6 @@
                 home-manager = {
                   useGlobalPkgs = true;
                   useUserPackages = true;
-                  backupFileExtension = "backup";
                   users.steve = import ./per-user/steve;
                 };
               }

@@ -1,10 +1,11 @@
+# per-host/comet/default.nix
 {
   pkgs,
   lib,
-  hostname,
   ...
 }: let
   inherit (pkgs.stdenv) isDarwin;
+  hostname = "comet";
 in {
   services.nix-daemon.enable = true;
   # Necessary for using flakes on this system.
