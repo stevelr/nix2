@@ -73,9 +73,8 @@
       packages = forAllSystems (
         system:
           with mkPkgsFor.${system}; {
-            inherit
-              hello-custom
-              ;
+            inherit hello-custom;
+            #backrest = pkgs.callPackage ./pkgs/backrest/backrest.nix {};
           }
       );
 
@@ -154,9 +153,6 @@
                   backupFileExtension = "backup";
                   users.steve = import ./per-user/steve;
                 };
-
-                # Optionally, use home-manager.extraSpecialArgs to pass
-                # arguments to home.nix
               }
             ]
             ++ commonModules;

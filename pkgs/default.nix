@@ -1,6 +1,6 @@
 # Custom packages, that can be defined similarly to ones from nixpkgs
 # You can build them using 'nix build .#example'
-{ pkgs, ... }:
-{
-   hello-custom = pkgs.callPackage ./hello-custom { };
+{pkgs, ...}: {
+  hello-custom = pkgs.callPackage ./hello-custom {};
+  #backrest = pkgs.callPackage ./backrest {};
 }
