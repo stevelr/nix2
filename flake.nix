@@ -2,7 +2,7 @@
   description = "Common NixOS config";
 
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-24.05";
 
     # You can access packages and modules from different nixpkgs revs
     # at the same time.
@@ -22,23 +22,20 @@
 
     # Home manager
     home-manager = {
-      url = "github:nix-community/home-manager";
+      # use /home-manager to get stable release
+      #url = "github:nix-community/home-manager";
+      url = "https://github.com/nix-community/home-manager/archive/release-24.05.tar.gz";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
 
   outputs = {self, ...} @ inputs:
     with inputs; let
-      # Supported systems for your flake packages, shell, etc.
       supportedSystems = [
         "aarch64-linux"
         "x86_64-linux"
         "aarch64-darwin"
         #"x86_64-darwin"
-      ];
-
-      commonModules = [
-        ./modules/common.nix
       ];
 
       forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
@@ -48,6 +45,10 @@
           pkgs = inputs.nixpkgs.legacyPackages.${system};
           inherit system;
         });
+
+      commonModules = [
+        ./modules/common.nix
+      ];
 
       mkSystem = {
         system,
@@ -60,7 +61,7 @@
           modules =
             [
               # import the overlays module
-              (import ./overlays)
+              (import ./overlays {inherit inputs;})
 
               # common modules
               # ...
@@ -73,9 +74,7 @@
       packages = forAllSystems (
         system:
           with mkPkgsFor.${system}; {
-            inherit
-              hello-custom
-              ;
+            inherit hello-custom;
           }
       );
 
@@ -102,21 +101,14 @@
         home-manager = inputs.home-manager.darwinModules.home-manager;
       in {
         comet = inputs.nix-darwin.lib.darwinSystem {
-          specialArgs = {
-            hostname = "comet";
-          };
+          specialArgs = {};
           modules =
             [
               ./per-host/comet
               home-manager
               {
                 home-manager = {
-                  extraSpecialArgs = {
-                    hostname = "comet";
-                    username = "steve";
-                  };
                   useGlobalPkgs = true;
-                  useUserPackages = true;
                   users."steve" = import ./per-user/steve;
                 };
               }
@@ -145,22 +137,13 @@
           hostname = "aster";
           modules =
             [
-              ./per-host/aster/configuration.nix
+              ./per-host/aster
               home-manager
               {
                 home-manager = {
-                  extraSpecialArgs = {
-                    hostname = "aster";
-                    username = "steve";
-                  };
                   useGlobalPkgs = true;
-                  useUserPackages = true;
-                  backupFileExtension = "backup";
                   users.steve = import ./per-user/steve;
                 };
-
-                # Optionally, use home-manager.extraSpecialArgs to pass
-                # arguments to home.nix
               }
             ]
             ++ commonModules;

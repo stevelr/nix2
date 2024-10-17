@@ -1,10 +1,8 @@
-{
-  pkgs,
-  username,
-  ...
-}: let
+# per-user/steve/default.nix
+{pkgs, ...}: let
   inherit (pkgs.stdenv) isDarwin;
   inherit (pkgs.lib) optionalAttrs;
+  username = "steve";
 in {
   imports = [
     ./git.nix
@@ -13,14 +11,14 @@ in {
   ];
 
   # needed because home-manager is 24.11 and nixos is 24.05. I don't know why it's at 24.11 though
-  home.enableNixpkgsReleaseCheck = false;
+  #gome.enableNixpkgsReleaseCheck = false;
 
   home.username = username;
   home.homeDirectory =
     if isDarwin
     then "/Users/${username}"
     else "/home/${username}";
-  home.stateVersion = "24.11";
+  home.stateVersion = "24.05";
 
   home.packages = with pkgs; [
     # nats

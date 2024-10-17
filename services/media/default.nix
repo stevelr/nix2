@@ -1,13 +1,23 @@
 # services/media/default.nix
 #
-# TODO: test jellyfin gpu configuration
-# TODO: health check and recovery services
-#       (1) health check - either as separate service or ExecStartPost with systemd-notify and watchdog timer
-#       (2) recovery service as in https://www.redhat.com/sysadmin/systemd-automate-recovery
-# TODO: we can do a little more fine-tuning of where logs end up, by adding somem symlinks
-#   several services use XDG_CONFIG_HOME for configuration, data, and logs.
-#   peryaps we could use mounts or symlinks to isolate those.
+# TODO (1): - audiobookshelf not working yet
+# TODO (1): - additional firwall rules
+#   for incoming (10.2.x.x network)
+#     allow established,related connections
+#     allow port forwarding to qbt listening port
+#     block 22, 80, 443, qbt
+#     block incomoing (ct state new or unknown) from 10.2.x to all other ports
+# TODO (2): test jellyfin gpu configuration
+# TODO (3): health check and recovery services
+#       (1) health check - either as separate service or ExecStartPost
+#           with systemd-notify and watchdog timer
+#       (2) recovery service as in
+#           https://www.redhat.com/sysadmin/systemd-automate-recovery
 #
+# TODO (3): log file locations
+#       prefer them to be in /media/log
+#       some services use XDG_CONFIG_HOME for data and logs. we could use symlinks
+#         (or bind mounts, like we do for nginx) to separate them
 {
   config,
   pkgs,
@@ -20,6 +30,7 @@
   mkGroups = pkgs.myLib.mkGroups config.my.userids;
 
   cfg = config.my.media;
+  nsCfg = config.my.vpnNamespaces.${cfg.namespace};
 
   audiobookshelf = (import ./audiobookshelf.nix {inherit pkgs config;}).mkAudiobookshelfService cfg;
   jackett = (import ./jackett.nix {inherit pkgs config;}).mkJackettService cfg;
@@ -40,12 +51,12 @@
 
   serverConfig = name: port: ''
     server {
-      listen                    80;
+      listen                    ${nsCfg.veNsIp4}:80;
       server_name               ${name};
       return                    301 https://$host$request_uri;
     }
     server {
-      listen                    443 ssl;
+      listen                    ${nsCfg.veNsIp4}:443 ssl;
       http2                     on;
       server_name               ${name};
       location / {
@@ -58,15 +69,15 @@
     }
   '';
 
-  # nginx template for static site that is also marked default for the listen IP address
+  # nginx template for static site . also default_server
   staticSite = host: www: ''
     server {
-      listen                    80 default_server;
+      listen                    ${nsCfg.veNsIp4}:80 default_server;
       server_name               ${host};
       return                    301 https://$host$request_uri;
     }
     server {
-      listen                    443 ssl default_server;
+      listen                    ${nsCfg.veNsIp4}:443 ssl default_server;
       server_name               ${host};
       location / {
         autoindex off;
@@ -277,7 +288,13 @@ in {
           enable = true;
           settings.PermitRootLogin = "no";
           settings.PasswordAuthentication = false;
-          ports = [cfg.sshPort];
+          listenAddresses = [
+            {
+              addr = "${nsCfg.veNsIp4}";
+              port = cfg.sshPort;
+            }
+          ];
+          startWhenNeeded = lib.mkForce false;
         };
         services.resolved.enable = false;
 
