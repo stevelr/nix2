@@ -499,7 +499,7 @@ in {
             stateVersion = mkOption {
               type = types.str;
               description = "default nixos stateVersion for containers";
-              #default = "24.11";
+              default = "24.05";
             };
             timezone = mkOption {
               type = types.str;
@@ -738,7 +738,7 @@ in {
     };
 
     my.containerCommon.timezone = "Etc/UTC";
-    my.containerCommon.stateVersion = "24.11";
+    my.containerCommon.stateVersion = "24.05";
 
     my.subnets = builtins.mapAttrs (_: n: (makeNet n)) config.my.pre.subnets;
     my.hostNets = builtins.mapAttrs (_: n: (makeNet n)) config.my.pre.hostNets;

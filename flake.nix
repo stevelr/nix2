@@ -2,7 +2,7 @@
   description = "Common NixOS config";
 
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-24.05";
 
     # You can access packages and modules from different nixpkgs revs
     # at the same time.
@@ -22,7 +22,9 @@
 
     # Home manager
     home-manager = {
-      url = "github:nix-community/home-manager";
+      # use /home-manager to get stable release
+      #url = "github:nix-community/home-manager";
+      url = "https://github.com/nix-community/home-manager/archive/release-24.05.tar.gz";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
@@ -59,7 +61,7 @@
           modules =
             [
               # import the overlays module
-              (import ./overlays)
+              (import ./overlays {inherit inputs;})
 
               # common modules
               # ...
@@ -107,7 +109,6 @@
               {
                 home-manager = {
                   useGlobalPkgs = true;
-                  useUserPackages = true;
                   users."steve" = import ./per-user/steve;
                 };
               }
@@ -141,7 +142,6 @@
               {
                 home-manager = {
                   useGlobalPkgs = true;
-                  useUserPackages = true;
                   users.steve = import ./per-user/steve;
                 };
               }
