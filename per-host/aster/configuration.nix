@@ -347,7 +347,6 @@ in {
         allowedUDPPorts = [53];
         allowedTCPPorts =
           [22 53]
-          ++ [ 18888 ] # for experiments
           ++ (lib.optionals config.my.services.tailscale.enable [config.my.ports.tailscale.port])
           ++ (lib.optionals config.my.containers.vault.enable [config.my.ports.vault.port config.my.ports.vaultCluster.port]);
       };
