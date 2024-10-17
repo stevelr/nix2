@@ -1,5 +1,5 @@
 # Created by following:
-# https://openzfs.github.io/openzfs-docs/Getting%20Started/NixOS/Root%20on%20ZFS/0-overview.html
+# https://openzfs.github.io/openzfs-docs/Getting%20Started/NixOS/Root%20on%20ZFS.html
 #
 { config, lib, ... }:
 let
@@ -126,7 +126,8 @@ in
 
   config =
     let
-      inherit (config.my) hostName;
+      hostName = "pangea";
+      #inherit (config.my) hostName;
       inherit (config.my.zfs) mirrorDrives firstDrive partitions pools encryptedHomes usersZvolsForVMs;
 
       # Copy the contents of this given sub-directory into the `/nix/store/`, and evaluate to a

@@ -30,12 +30,12 @@ in
 {
   imports =
     [
-      ../../services
-      #./debugging.nix
       ./zfs
       ./networking
-      ../../modules/spell-checking.nix
       ./virtualisation.nix
+      ../../services
+      ../../modules/spell-checking.nix
+      ../../modules/debugging.nix
       ./hardware-configuration.nix
     ]
     ++ (optional (pathExists ./private.nix) ./private.nix);
@@ -550,29 +550,6 @@ in
         # efi.canTouchEfiVariables = false;
       };
 
-      # Not doing this anymore, because the latest kernel versions can cause problems due to being
-      # newer than what the other packages in the stable NixOS channel expect.  E.g. it caused trying
-      # to use a version of the VirtualBox extensions modules (or something) for the newer kernel but
-      # this was marked broken which prevented building the NixOS system.
-      #
-      # # Use the latest kernel version that is compatible with the used ZFS
-      # # version, instead of the default LTS one.
-      # kernelPackages = config.boot.zfs.package.latestCompatibleLinuxPackages;
-      # # Following https://nixos.wiki/wiki/Linux_kernel --
-      # # Note that if you deviate from the default kernel version, you should also
-      # # take extra care that extra kernel modules must match the same version. The
-      # # safest way to do this is to use config.boot.kernelPackages to select the
-      # # correct module set:
-      # extraModulePackages = with config.boot.kernelPackages; [ ];
-
-      kernelParams = [
-        #"video=HDMI-A-1:3440x1440@100"  # Use 100 Hz, like xserver.
-        #"video=eDP-1:d"  # Disable internal lid screen.
-        #"tuxedo_keyboard.state=0"              # backlight off
-        #"tuxedo_keyboard.brightness=25"        # low, if turned on
-        #"tuxedo_keyboard.color_left=0xff0000"  # red, if turned on
-      ];
-
       zfs.requestEncryptionCredentials = false; # Or could be a list of selected datasets.
 
       # enable dynamically installing systemd units. Needed by extra-container
@@ -606,47 +583,9 @@ in
 
     time.timeZone = "Etc/UTC";
 
-    #console.font = "ter-v24n";
-
     #hardware.cpu.amd.updateMicrocode = true;
 
-    # Enable sound.
-    # 'sound' not supported after 24.05. What's the new way?
-    #sound.enable = true;
     hardware.pulseaudio.enable = false;
-
-    # Bluetooth
-    #hardware.bluetooth.enable = true;
-    #services.blueman.enable = true;
-
-    # Controls for Tuxedo Computers hardware that also work on my Clevo NH55EJQ.
-    #hardware.tuxedo-keyboard.enable = true;  # Also enabled by the next below.
-    # I use this for dynamic fan-speed adjusting based on CPU temperature.
-    #hardware.tuxedo-rs.enable = true;
-    #hardware.tuxedo-rs.tailor-gui.enable = is.GUI;
-
-    # No longer needed since NixOS 24.05 has newer kernel version, and by default it uses the
-    # amd_pstate_epp CPUFreq driver with that's built-in "powersave" governor, and that has similar
-    # slower latency and highest frequency as the "conservative" governor, as desired.
-    #
-    # # Have dynamic CPU-frequency reduction based on load, to keep temperature and fan noise down
-    # # when there's light load, but still allow high frequencies (limited by the separate choice of
-    # # fan-speed-management-profile's curve's efficacy at removing heat) when there's heavy load.
-    # # Other choices for this are: "schedutil" or "ondemand".  I choose "conservative" because it
-    # # seems to not heat-up my CPUs as easily, e.g. when watching a video, which avoids turning-on
-    # # the noisy fans, but it still allows the highest frequency when under sustained heavy load
-    # # which is what I care about (i.e. I don't really care about the faster latency of "ondemand"
-    # # nor the somewhat-faster latency of "schedutil").  Note: maximum performance is attained with
-    # # the fans' speeds at the highest, which I have a different profile for in Tuxedo-rs's Tailor
-    # # that I switch between as desired.
-    # powerManagement.cpuFreqGovernor = "conservative";
-
-    #services.printing.drivers = [ pkgs.hplip ];
-
-    #hardware.sane = {
-    #  enable = true;
-    #  extraBackends = [ pkgs.hplipWithPlugin ];
-    #};
 
     documentation = {
       man.enable = true; # install man page
@@ -658,37 +597,6 @@ in
       # This option also forces us to include descriptions for all my custom options
       nixos.includeAllModules = true;
     };
-
-    # Have debug-info and source-code for packages where this is applied.  This is for packages that
-    # normally don't provide these, and this uses my custom approach that overrides and overlays
-    # packages to achieve having these.
-    #my.debugging.support = {
-    #  all.enable = true;
-    #  sourceCode.of.prebuilt.packages = with pkgs; [
-    #    # TODO: Unsure if this is the proper way to achieve this for having the Rust library source
-    #    # that corresponds to binaries built by Nixpkgs' `rustc`.
-    #    # Have the Rust standard library source.  Get it from this `rustc` package, because it
-    #    # locates it at the same `/build/rustc-$VER-src/` path where its debug-info has it recorded
-    #    # for binaries it builds, and because this seems to be the properly corresponding source.
-    #    # TODO: is this true, or else where is its sysroot or whatever?
-    #    (rustc.unwrapped.overrideAttrs (origAttrs: {
-    #      # Only keep the `library` source directory, not the giant `src` (etc.) ones.  This greatly
-    #      # reduces the size that is output to the `/nix/store`.  The `myDebugSupport_saveSrcPhase`
-    #      # of `myLib.pkgWithDebuggingSupport` will run after ours and will only copy the
-    #      # `$sourceRoot` as it'll see it as changed by us here.  If debugging of `rustc` itself is
-    #      # ever desired, this could be removed so that its sources are also included (I think).
-    #      preBuildPhases = ["myDebugSupport_rust_onlyLibraryDir"];
-    #      myDebugSupport_rust_onlyLibraryDir = ''
-    #        export sourceRoot+=/library
-    #        pushd "$NIX_BUILD_TOP/$sourceRoot"
-    #      '';
-    #    }))
-    #  ];
-    #};
-
-    #nix = {
-    #daemonCPUSchedPolicy = "idle"; daemonIOSchedClass = "idle";  # So builds defer to my tasks.
-    #};
   };
 
 }
