@@ -145,14 +145,10 @@
           hostname = "aster";
           modules =
             [
-              ./per-host/aster/configuration.nix
+              ./per-host/aster
               home-manager
               {
                 home-manager = {
-                  extraSpecialArgs = {
-                    hostname = "aster";
-                    username = "steve";
-                  };
                   useGlobalPkgs = true;
                   useUserPackages = true;
                   backupFileExtension = "backup";

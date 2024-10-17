@@ -1,10 +1,8 @@
-{
-  pkgs,
-  username,
-  ...
-}: let
+# per-user/steve/default.nix
+{pkgs, ...}: let
   inherit (pkgs.stdenv) isDarwin;
   inherit (pkgs.lib) optionalAttrs;
+  username = "steve";
 in {
   imports = [
     ./git.nix
