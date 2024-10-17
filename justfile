@@ -15,6 +15,9 @@ rebuild:
 comet:
     darwin-rebuild switch --flake .#comet
 
+pangea:
+    sudo nixos-rebuild --cores 4 build --flake .#pangea --show-trace
+    
 b:
     nix-build --log-format internal-json -v |& nom --json
 
