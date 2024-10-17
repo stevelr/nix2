@@ -166,6 +166,7 @@ in {
             "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFilbUTPgUrnInm3Nz2U0rE5oUCzx4uFgwGJYjZwmhpN user@aster"
           ];
         };
+        sshPort = 2022;
         storage = {
           hostBase = "/var/lib/media";
           localBase = "/media";
@@ -336,6 +337,7 @@ in {
         ${mediaIP} radarr.${fqdn}
         ${mediaIP} jackett.${fqdn}
         ${mediaIP} prowlarr.${fqdn}
+        ${mediaIP} audiobookshelf.${fqdn}
       '';
 
       useNetworkd = true;
@@ -345,6 +347,7 @@ in {
         allowedUDPPorts = [53];
         allowedTCPPorts =
           [22 53]
+          ++ [ 18888 ] # for experiments
           ++ (lib.optionals config.my.services.tailscale.enable [config.my.ports.tailscale.port])
           ++ (lib.optionals config.my.containers.vault.enable [config.my.ports.vault.port config.my.ports.vaultCluster.port]);
       };

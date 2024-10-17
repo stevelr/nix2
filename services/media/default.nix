@@ -4,6 +4,10 @@
 # TODO: health check and recovery services
 #       (1) health check - either as separate service or ExecStartPost with systemd-notify and watchdog timer
 #       (2) recovery service as in https://www.redhat.com/sysadmin/systemd-automate-recovery
+# TODO: we can do a little more fine-tuning of where logs end up, by adding somem symlinks
+#   several services use XDG_CONFIG_HOME for configuration, data, and logs.
+#   peryaps we could use mounts or symlinks to isolate those.
+#
 {
   config,
   pkgs,
@@ -17,34 +21,37 @@
 
   cfg = config.my.media;
 
-  #dataDir = s: "${cfg.storage.localBase}/data/${s}";
-
-  qbittorrent = (import ./qbittorrent.nix {inherit pkgs config;}).mkQbittorrentService cfg;
-  jellyfin = (import ./jellyfin.nix {inherit pkgs config;}).mkJellyfinService cfg;
-  sonarr = (import ./sonarr.nix {inherit pkgs config;}).mkSonarrService cfg;
-  radarr = (import ./radarr.nix {inherit pkgs config;}).mkRadarrService cfg;
+  audiobookshelf = (import ./audiobookshelf.nix {inherit pkgs config;}).mkAudiobookshelfService cfg;
   jackett = (import ./jackett.nix {inherit pkgs config;}).mkJackettService cfg;
+  jellyfin = (import ./jellyfin.nix {inherit pkgs config;}).mkJellyfinService cfg;
   prowlarr = (import ./prowlarr.nix {inherit pkgs config;}).mkProwlarrService cfg;
+  qbittorrent = (import ./qbittorrent.nix {inherit pkgs config;}).mkQbittorrentService cfg;
+  radarr = (import ./radarr.nix {inherit pkgs config;}).mkRadarrService cfg;
+  sonarr = (import ./sonarr.nix {inherit pkgs config;}).mkSonarrService cfg;
 
   # nginx template for backend service
+  # params:
+  #   host: hostname fqdn, such as "jellyfin.myhost.org"
+  #   port: integer port of backend service
   # defaults includes
   #      proxy_http_version      1.1;
   #      proxy_set_header        Upgrade $http_upgrade;   # for websockets
   #      proxy_set_header        Connection "upgrade";    # for websockets
 
-  serverConfig = name: ''
+  serverConfig = name: port: ''
     server {
       listen                    80;
-      server_name               ${name}.${cfg.urlDomain};
-      return                    301  https://$host$request_uri;
+      server_name               ${name};
+      return                    301 https://$host$request_uri;
     }
     server {
       listen                    443 ssl;
       http2                     on;
-      server_name               ${name}.${cfg.urlDomain};
+      server_name               ${name};
       location / {
-        proxy_pass              http://127.0.0.1:${toString config.my.ports.${name}.port};
+        proxy_pass              http://127.0.0.1:${toString port};
         proxy_set_header        Host $host;
+        proxy_set_header        X-Real-IP $remote_addr;
         proxy_set_header        X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header        X-Forwarded-Proto $scheme;
       }
@@ -56,7 +63,7 @@
     server {
       listen                    80 default_server;
       server_name               ${host};
-      return                    301  https://$host$request_uri;
+      return                    301 https://$host$request_uri;
     }
     server {
       listen                    443 ssl default_server;
@@ -111,6 +118,12 @@ in {
           default = null;
           example = {packages = [pkgs.hello];};
         };
+        sshPort = mkOption {
+          type = types.nullOr types.int;
+          description = "ssh listener port, or null to disable openssh server";
+          default = null;
+          example = 2222;
+        };
         storage = mkOption {
           type = types.submodule {
             options = {
@@ -160,6 +173,14 @@ in {
           hostPath = "/root/certs/aster.pasilla.net";
           isReadOnly = true;
         };
+        # due to systemd.service.nginx hardening (as configured by the nixpkgs nginx module),
+        # /media/log/nginx appears as a read-only filesystem to the nginx service. This bind mount
+        # lets us log to the mounted volume but in a permitted fs path
+        nginxLogs = {
+          mountPoint = "/var/log/nginx";
+          hostPath = "${cfg.storage.hostBase}/log/nginx";
+          isReadOnly = false;
+        };
         gpu = {
           mountPoint = "/dev/dri/renderD128";
           hostPath = "/dev/dri/renderD128";
@@ -168,26 +189,18 @@ in {
       };
 
       config = {
-        environment.systemPackages = with pkgs; [
-          bash
-          bind.dnsutils
-          jq
-          lsof
-          nmap
-          helix
-        ];
         networking = {
           nftables = {
             enable = true;
           };
           firewall = {
             enable = true;
-            allowedTCPPorts = [80 443];
+            allowedTCPPorts = [80 443] ++ (lib.optionals (!isNull cfg.sshPort) [cfg.sshPort]);
           };
           # add each backend to /etc/hosts (within the container)
           extraHosts =
             concatStringsSep "\n"
-            (map (s: "127.0.0.1 ${s} ${s}.${cfg.urlDomain}") cfg.backends);
+            (map (s: "127.0.0.1 ${s}.${cfg.urlDomain}") cfg.backends);
         };
 
         # Create users and groups. Each backend service runs with its own unique userid.
@@ -207,19 +220,14 @@ in {
           ]);
 
         systemd.services =
-          qbittorrent.services
+          {}
+          // audiobookshelf.services
+          // jackett.services
           // jellyfin.services
-          // sonarr.services
-          // radarr.services
           // prowlarr.services
-          // jackett.services;
-
-        services.openssh = {
-          enable = true;
-        };
-
-        security.sudo = cfg.sudo;
-        programs.zsh.enable = true;
+          // qbittorrent.services
+          // radarr.services
+          // sonarr.services;
 
         services.nginx = {
           enable = true;
@@ -234,7 +242,7 @@ in {
           statusPage = true; # enable http://127.0.0.1/nginx_status
 
           appendConfig = ''
-            worker_processes 2;
+            worker_processes 4;
           '';
 
           commonHttpConfig = ''
@@ -251,8 +259,8 @@ in {
 
             proxy_headers_hash_max_size 2048;
             log_format myformat       '$http_x_forwarded_for $remote_addr [$time_local] "$request" $status $body_bytes_sent "$http_referer" "$http_user_agent" $upstream_response_time';
-            access_log                /var/log/nginx/access.log myformat;
-            error_log                 /var/log/nginx/error.log warn;
+            access_log                 /var/log/nginx/access.log myformat;
+            error_log                  /var/log/nginx/error.log warn;
           '';
 
           # generate server{} stanzas for each backend
@@ -261,8 +269,33 @@ in {
             # ignore staticSite param and use generated file
             (staticSite "${cfg.urlDomain}" "/etc/www")
             # backends
-            + (concatStringsSep "\n" (map (s: serverConfig s) cfg.backends));
+            + (concatStringsSep "\n" (map (s: serverConfig "${s}.${cfg.urlDomain}" config.my.ports.${s}.port)
+                cfg.backends));
         };
+
+        services.openssh = lib.optionalAttrs (!isNull cfg.sshPort) {
+          enable = true;
+          settings.PermitRootLogin = "no";
+          settings.PasswordAuthentication = false;
+          ports = [cfg.sshPort];
+        };
+        services.resolved.enable = false;
+
+        security.sudo = cfg.sudo;
+
+        programs.zsh.enable = true;
+
+        environment.systemPackages = with pkgs; [
+          bash
+          bind.dnsutils
+          jq
+          lsof
+          nmap
+          helix
+          # a few of the tools use sqlite (v3)
+          sqlite
+          sqlite-utils
+        ];
 
         environment.etc."resolv.conf".text = let
           # set dns resolver to the vpn's dns
@@ -316,19 +349,20 @@ in {
           <body>
             <div>
               <h1>Jump to ...</h1>
-              <p><a href="https://jellyfin.${cfg.urlDomain}">jellyfin</a></p>
-              <p><a href="https://sonarr.${cfg.urlDomain}">sonarr</a></p>
-              <p><a href="https://radarr.${cfg.urlDomain}">radarr</a></p>
-              <p><a href="https://prowlarr.${cfg.urlDomain}">prowlarr</a></p>
+              <p><a href="https://audiobookshelf.${cfg.urlDomain}">audiobookshelf</a></p>
               <p><a href="https://jackett.${cfg.urlDomain}">jackett</a></p>
+              <p><a href="https://jellyfin.${cfg.urlDomain}">jellyfin</a></p>
+              <p><a href="https://prowlarr.${cfg.urlDomain}">prowlarr</a></p>
               <p><a href="https://qbittorrent.${cfg.urlDomain}">qbittorrent</a></p>
+              <p><a href="https://radarr.${cfg.urlDomain}">radarr</a></p>
+              <p><a href="https://sonarr.${cfg.urlDomain}">sonarr</a></p>
             </div>
           </body>
           </html>
         '';
 
-        services.resolved.enable = false;
         environment.variables.TZ = config.my.containerCommon.timezone;
+
         system.stateVersion = config.my.containerCommon.stateVersion;
       };
     };

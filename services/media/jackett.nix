@@ -52,7 +52,10 @@
               ${ensureDir "${configHome}/Jackett" "700"}
             '';
           in "!${preStartScript}";
-          ExecStart = "${pkgs.jackett}/bin/jackett";
+          ExecStart = ''
+            ${pkgs.jackett}/bin/jackett \
+              --Port ${toString config.my.ports.jackett.port}
+          '';
         };
       };
     };

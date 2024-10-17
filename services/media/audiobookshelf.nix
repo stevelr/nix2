@@ -52,7 +52,12 @@
               ${ensureDir "${configHome}/audiobookshelf" "700"}
             '';
           in "!${preStartScript}";
-          ExecStart = "${pkgs.audiobookshelf}/bin/audiobookshelf";
+          ExecStart = ''
+            ${pkgs.audiobookshelf}/bin/audiobookshelf \
+               --metadata ${dataHome}/audiobookshelf \
+               --config ${configHome}/audiobookshelf \
+               --port ${toString config.my.ports.audiobookshelf.port}
+          '';
         };
       };
     };
