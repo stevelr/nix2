@@ -42,7 +42,7 @@ in
           type = "prometheus_scrape";
           endpoint = "http://${ip}:${toString port}/metrics";
         };
-        metrics = port: "http://10.135.1.2:${toString port}/metrics";
+        #metrics = port: "http://10.135.1.2:${toString port}/metrics";
         settings = {
           data_dir = dataDir;
           api = {

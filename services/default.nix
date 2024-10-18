@@ -330,24 +330,7 @@ in {
       # allocate listening ports
       ports = mkOption {
         description = "listening ports";
-        type = types.attrsOf (types.submodule {
-          options = {
-            port = mkOption {
-              type = types.int;
-              description = "listen port";
-            };
-            enable = mkOption {
-              type = types.bool;
-              default = true;
-              description = "whether the port should be opened";
-            };
-            description = mkOption {
-              type = types.str;
-              default = "";
-              description = "description of port or service";
-            };
-          };
-        });
+        type = types.attrsOf types.anything;
         default = {};
       };
 
@@ -579,150 +562,178 @@ in {
   };
 
   config = {
-    # consistent id numbering for file mounts
+    # consistent id numbering for persistent direectories
+    # and shared volume mounts
     my.userids = {
-      # interactive users
-      steve = {
-        uid = 1000;
-        gid = 100;
-        isInteractive = true;
-      };
+      ##
+      ## Interactive users
+      ##
+      steve =
+        (
+          if pkgs.stdenv.isDarwin
+          then {
+            uid = 501;
+            gid = 20;
+          }
+          else {
+            uid = 1000;
+            gid = 100;
+          }
+        )
+        // {
+          isInteractive = true;
+        };
       user = {
         uid = 1001;
         gid = 100;
         isInteractive = true;
       };
 
-      # services
-      seafile = {
-        uid = 4001;
-        gid = 4001;
-      };
-      pmail = {
-        uid = 4002;
-        gid = 4002;
-      };
+      ##
+      ## Service account ids starting at 5501 ...
+      ## Group ids starting at 5801 ...
+      ##
+      # user ids 500-999 are available according to this ...
+      # https://github.com/NixOS/nixpkgs/blob/f705ee21f6a18c10cff4679142d3d0dc95415daa/nixos/modules/programs/shadow.nix#L13-L14
+      # .. however some unix services (sshd,ntpd,etc.) start at 998 counting down ..
+      ##
       unbound = {
-        uid = 4003;
-        gid = 4003;
+        uid = 5501;
+        gid = 5501;
       };
       vault = {
-        uid = 4004;
-        gid = 4004;
+        uid = 5502;
+        gid = 5502;
       };
       gitea = {
-        uid = 4005;
-        gid = 4005;
+        uid = 5503;
+        gid = 5503;
       };
       postgres = {
-        uid = 4006;
-        gid = 4006;
+        uid = 5504;
+        gid = 5504;
+      };
+      mysql = {
+        uid = 5505;
+        gid = 5505;
+      };
+      clickhouse = {
+        uid = 5506;
+        gid = 5506;
+      };
+      seafile = {
+        uid = 5507;
+        gid = 5507;
       };
       nginx = {
-        uid = 4007;
-        gid = 4007;
+        uid = 5508;
+        gid = 5508;
       };
-
       grafana = {
-        uid = 4010;
-        gid = 4010;
+        uid = 5509;
+        gid = 5509;
       };
       prometheus = {
-        uid = 4011;
-        gid = 4011;
+        uid = 5510;
+        gid = 5510;
         extraGroups = ["exporters"];
       };
       loki = {
-        uid = 4012;
-        gid = 4012;
+        uid = 5511;
+        gid = 5511;
       };
       tempo = {
-        uid = 4013;
-        gid = 4013;
+        uid = 5512;
+        gid = 5512;
       };
       nats = {
-        uid = 4014;
-        gid = 4014;
-      };
-      clickhouse = {
-        uid = 4015;
-        gid = 4015;
+        uid = 5513;
+        gid = 5513;
       };
       vector = {
-        uid = 4016;
-        gid = 4016;
+        uid = 5514;
+        gid = 5514;
       };
-      #exporter = { uid = 4017; gid = 4017; }; # generic for node exporters
-
-      jellyfin = {
-        uid = 4100;
-        gid = 4100;
-        extraGroups = ["media-group" "render" "video"];
+      kea = {
+        uid = 5515;
+        gid = 5515;
       };
-      sonarr = {
-        uid = 4101;
-        gid = 4101;
-        extraGroups = ["media-group"];
+      pmail = {
+        uid = 5516;
+        gid = 5516;
       };
-      radarr = {
-        uid = 4102;
-        gid = 4102;
-        extraGroups = ["media-group"];
-      };
-      qbittorrent = {
-        uid = 4103;
-        gid = 4103;
-        extraGroups = ["media-group"];
-      };
-      audiobookshelf = {
-        uid = 4104;
-        gid = 4104;
-        extraGroups = ["media-group"];
-      };
+      # available: 5517-5549
+      # skip a few
       media = {
-        uid = 4105;
-        gid = 4105;
+        uid = 5550;
+        gid = 5550;
         isInteractive = true;
         extraGroups = ["media-group"];
       };
+      jellyfin = {
+        uid = 5551;
+        gid = 5551;
+        extraGroups = ["media-group" "render" "video"];
+      };
+      sonarr = {
+        uid = 5552;
+        gid = 5552;
+        extraGroups = ["media-group"];
+      };
+      radarr = {
+        uid = 5553;
+        gid = 5553;
+        extraGroups = ["media-group"];
+      };
+      qbittorrent = {
+        uid = 5554;
+        gid = 5554;
+        extraGroups = ["media-group"];
+      };
+      audiobookshelf = {
+        uid = 5555;
+        gid = 5555;
+        extraGroups = ["media-group"];
+      };
       jackett = {
-        uid = 4106;
-        gid = 4106;
+        uid = 5556;
+        gid = 5556;
         extraGroups = ["media-group"];
       };
       prowlarr = {
-        uid = 4107;
-        gid = 4107;
+        uid = 5557;
+        gid = 5557;
         extraGroups = ["media-group"];
       };
+
+      ##
+      ## Groups, starting at 5801
+      ##
       # developer group
-      developer = {gid = 4500;};
+      developer = {gid = 5801;};
       # prometheus exporters
-      exporters = {gid = 4501;};
-      media-group = {gid = 4502;};
+      exporters = {gid = 5802;};
+      media-group = {gid = 5803;};
     };
 
-    # service ports
+    ##
+    ## service ports
+    ##
     my.ports = {
-      clickhouseHttp = {port = 8123;};
-      clickhouseTcp = {port = 9000;};
+      clickhouse = {
+        http = 8123; # http protocol
+        binary = 9000; # binary protocol (TCP)
+      };
       incus = {port = 10200;};
       kea = {port = 14461;};
       nats = {port = 4222;};
-      node = {
-        port = 9100;
-        description = "node exporter";
-      };
+      node-exporter = {port = 9100;};
       ssh = {port = 22;};
       tailscale = {port = 41641;}; # config.my.services.tailscale.port;
       unbound = {port = 53;};
       vault = {
-        port = 8200;
-        description = "Hashicorp vault api port";
-      };
-      vaultCluster = {
-        port = 8201;
-        description = "Hashicorp vault cluster port";
+        apiPort = 8200;
+        clusterPort = 8201;
       };
 
       vector = {port = 8686;};

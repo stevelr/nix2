@@ -6,7 +6,7 @@
     enable = true;
     user = "${name}-exporter";
     group = "exporters";
-    port = config.my.ports.${name}.port;
+    port = config.my.ports."node-exporter".port;
     listenAddress = collectorIp;
   };
 in {

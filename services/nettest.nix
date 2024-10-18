@@ -48,7 +48,7 @@ in {
           networking.nftables.enable = true;
 
           users.users.user = {
-            uid = 1000;
+            uid = config.my.userids."user".uid;
             group = "users";
             isNormalUser = true;
           };

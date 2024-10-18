@@ -162,21 +162,23 @@ in {
             hostSsh = 3022; # port host listens on that's forwarded to container ssh
           };
         };
-        "vault" = {
+        "vault" = let
+          cfgPorts = config.my.ports.vault;
+        in {
           name = "vault";
           bridge = "container-br0";
           address = "10.144.0.17";
-          proxyPort = config.my.ports.vault.port;
+          proxyPort = cfgPorts.apiPort;
           settings = {
             enable = false;
             # internal port
             #apiPort = 8200;
-            clusterPort = 8201;
+            clusterPort = cfgPorts.clusterPort;
             clusterName = "pasilla.net";
             # external api address
             apiAddr = "https://vault.pasilla.net";
             # external cluster address
-            clusterAddr = "https://vault.pasilla.net:8201";
+            clusterAddr = "https://vault.pasilla.net:${toString cfgPorts.clusterPort}";
             # server log level: trace,debug,info.warn,err
             logLevel = "info"; #
             storagePath = "/var/lib/vault";
@@ -213,8 +215,8 @@ in {
           bridge = "container-br0";
           address = "10.144.0.22";
           settings = {
-            httpPort = config.my.ports.clickhouseHttp.port;
-            tcpPort = config.my.ports.clickhouseTcp.port;
+            httpPort = config.my.ports.clickhouse.http;
+            tcpPort = config.my.ports.clickhouse.binary;
           };
         };
         "vector" = {
@@ -264,18 +266,52 @@ in {
     };
 
     # enable all users and groups on pangea
-
-    users.users = lib.recursiveUpdate (mkUsers ["steve" "user"]) {
-      # extra user attributes
-      steve = {
-        group = "users";
-        extraGroups = ["wheel" "audio" "video" "podman" "incus-admin"];
-      };
-      user = {
-        extraGroups = ["podman" "incus"];
-      };
-    }; # // exporterUsers;
-    users.groups = mkGroups ["exporters"];
+    users.users =
+      lib.recursiveUpdate (mkUsers [
+        # interactive
+        "steve"
+        "user"
+        # services
+        "gitea"
+        "grafana"
+        "kea"
+        "mysql"
+        "nats"
+        "nginx"
+        "postgresql"
+        "prometheus"
+        "seafile"
+        "unbound"
+        "vault"
+        "vector"
+      ]) {
+        # extra user attributes
+        steve = {
+          group = "users";
+          extraGroups = ["wheel" "audio" "video" "podman" "incus-admin"];
+        };
+        user = {
+          group = "users";
+          extraGroups = ["podman" "incus"];
+        };
+      }; # // exporterUsers;
+    users.groups = mkGroups [
+      # common group for prom exporters
+      "exporters"
+      # services
+      "gitea"
+      "grafana"
+      "kea"
+      "mysql"
+      "nats"
+      "nginx"
+      "postgresql"
+      "prometheus"
+      "seafile"
+      "unbound"
+      "vault"
+      "vector"
+    ];
 
     services.ntp = {
       enable = true;
