@@ -1,5 +1,9 @@
-{ config, lib, ... }:
-let
+{
+  config,
+  pkgs,
+  lib ? pkgs.lib,
+  ...
+}: let
   giteaCfg = config.my.containers.gitea; # gitea container cfg
   vaultCfg = config.my.containers.vault;
   vectorCfg = config.my.containers.vector;
@@ -16,8 +20,11 @@ let
   any_lan_ip = "{ ${lan_ip0}, ${lan_ip1} }";
 
   # create nft set with all bridge names, eg "{ br0, seafnet0, appnet0 }"
-  any_container_if = "{ " + (lib.concatStringsSep ", "
-    (map (snet: snet.name) bridges)) + " }";
+  any_container_if =
+    "{ "
+    + (lib.concatStringsSep ", "
+      (map (snet: snet.name) bridges))
+    + " }";
 
   # tcp services exposed on this host to lan
   # lan_tcp_services = "{ ${ssh}, ${https}, ${http}, ${vaultCls} }";
@@ -35,7 +42,7 @@ let
   https = "443";
   mdns = "5353";
   chHttp = toString clickhouseCfg.settings.httpPort;
-  chTcp= toString clickhouseCfg.settings.tcpPort;
+  chTcp = toString clickhouseCfg.settings.tcpPort;
   vectorApi = toString vectorCfg.settings.apiPort;
   exporters = "{ 9100-9799 }";
   #exporters = toString config.services.prometheus.exporters.systemd.port;
@@ -46,9 +53,12 @@ let
 
   # DNAT ports forwarded to containers
   forwardedPorts = "{ ${http}, ${https}, ${gitea_pub_ssh}, ${vaultCls}, ${chHttp}, ${chTcp}, ${vectorApi} }";
-   
+
   # use this to comment out rules pertaining to ipv6 if ipv6 is disabled
-  ifv6 = if config.my.enableIPv6 then "" else "# ";
+  ifv6 =
+    if config.my.enableIPv6
+    then ""
+    else "# ";
 
   ##
   ## rule generation
@@ -56,22 +66,27 @@ let
 
   ## If tailscale service is enabled, enable the udp port in
   # I don't know if this is necessaf
-  acceptTailscale = if tsCfg.enable then ''
-    udp dport ${tailscalePort} accept
-  '' else "";
-  
+  acceptTailscale =
+    if tsCfg.enable
+    then ''
+      udp dport ${tailscalePort} accept
+    ''
+    else "";
+
   # counters for bridge nat traffic
-  bridge_nat_counters = lib.concatStringsSep "\n"
+  bridge_nat_counters =
+    lib.concatStringsSep "\n"
     (map
       (snet: ''
         counter ctr_nat_${snet.name} { comment "nat from ${snet.name} to host or lan" }
       '')
       bridges);
 
-  bridge_SNAT_out = lib.concatStringsSep "\n"
+  bridge_SNAT_out =
+    lib.concatStringsSep "\n"
     (map
-      (snet:
-        "iifname ${snet.name} ip saddr ${snet.net} ip daddr != ${snet.net} counter name ctr_nat_${snet.name} masquerade"
+      (
+        snet: "iifname ${snet.name} ip saddr ${snet.net} ip daddr != ${snet.net} counter name ctr_nat_${snet.name} masquerade"
       )
       bridges);
 
@@ -102,7 +117,6 @@ let
   #     ) else "";
   # incus_lan_rules = incus_allow_if incusCfg.enable;
   incus_lan_rules = "";
-
   ##
   ## NFTABLES hooks
   ##
@@ -120,7 +134,7 @@ let
   ##  100 srcnat      (SNAT)
   ##  225             SELinux at packet exit
   ##  300             conntrack helpers
-  ##   
+  ##
   ##
   ## BRIDGE
   ## ============
@@ -132,8 +146,7 @@ let
   ##   200
   ##   300 srcnat
   ##
-in
-{
+in {
   # Host nftables firewall
   # container firewalls are in their own namespace and are defined elsewhere
   # we can't flushRuleset prior to load,
@@ -146,97 +159,97 @@ in
       host = {
         family = "inet";
         content = ''
-          counter input_refused       { comment "input refused" }
-          counter input_nomatch       { comment "input no match" }
-          counter input_allow_nomatch { comment "input-allow no match" }
-          counter input_ctr_nomatch   { comment "input-container no match" }
-          counter lan_http            { comment "input-lan http" }
-          counter lan_https           { comment "input-lan https" }
-          counter lan_ssh             { comment "input-lan ssh to pangea" }
-          counter lan_vault_api       { comment "input-lan vault api" }
-          counter lan_vault_cluster   { comment "input-lan vault cluster" }
-          counter lan_nomatch         { comment "input-lan no match" }
-          counter input_forward       { comment "inet input forwarded ports" }
-          counter ctr_http            { comment "input-ctr http" }
-          counter ctr_https           { comment "input-ctr https" }
-          counter ctr_ssh             { comment "input-ctr ssh" }
-          counter ctr_vault_api       { comment "input-ctr vault api" }
-          counter ctr_vault_cluster   { comment "input-ctr vault cluster" }
+           counter input_refused       { comment "input refused" }
+           counter input_nomatch       { comment "input no match" }
+           counter input_allow_nomatch { comment "input-allow no match" }
+           counter input_ctr_nomatch   { comment "input-container no match" }
+           counter lan_http            { comment "input-lan http" }
+           counter lan_https           { comment "input-lan https" }
+           counter lan_ssh             { comment "input-lan ssh to pangea" }
+           counter lan_vault_api       { comment "input-lan vault api" }
+           counter lan_vault_cluster   { comment "input-lan vault cluster" }
+           counter lan_nomatch         { comment "input-lan no match" }
+           counter input_forward       { comment "inet input forwarded ports" }
+           counter ctr_http            { comment "input-ctr http" }
+           counter ctr_https           { comment "input-ctr https" }
+           counter ctr_ssh             { comment "input-ctr ssh" }
+           counter ctr_vault_api       { comment "input-ctr vault api" }
+           counter ctr_vault_cluster   { comment "input-ctr vault cluster" }
 
-        	chain input {
-        		type filter hook input priority filter;              policy drop;
-        		iif "lo"                                             accept comment "allow from loopback"
-        		ct state vmap { \
-                invalid : drop, \
-                established : accept, \
-                related : accept, \
-                new : jump input-allow, \
-                untracked : jump input-allow \
-            }
-            # any forwardPorts defined in nspawn containers are forwarded by dnat rules
-            # in tables (ip io.systemd.nat) and (ip6 io.systemd.nat) created by systemd.
-            # Those ports need to be accepted here at priority 0.
-            tcp dport ${forwardedPorts} \
-                counter name input_forward                        accept
+          chain input {
+          	type filter hook input priority filter;              policy drop;
+          	iif "lo"                                             accept comment "allow from loopback"
+          	ct state vmap { \
+                 invalid : drop, \
+                 established : accept, \
+                 related : accept, \
+                 new : jump input-allow, \
+                 untracked : jump input-allow \
+             }
+             # any forwardPorts defined in nspawn containers are forwarded by dnat rules
+             # in tables (ip io.systemd.nat) and (ip6 io.systemd.nat) created by systemd.
+             # Those ports need to be accepted here at priority 0.
+             tcp dport ${forwardedPorts} \
+                 counter name input_forward                        accept
 
-        		tcp flags syn / fin,syn,rst,ack \
-                 log prefix "refused connection: " level info \
-                 counter name input_refused
-            counter name input_nomatch #                          drop
-        	}
-
-        	chain input-allow {
-            # lockout prevention: allow ssh from anywhere - even if interface names change
-            tcp dport ${ssh} counter name lan_ssh                accept
-            # dhcp, all interfaces
-            udp dport ${dhcp_ports}                              accept
-            # This icmp rule may be too loose, but ok for trusted lan and containers
-            ip protocol 1                                        accept comment "allow icmp"
-            ${ifv6} meta l4proto 58                              accept comment "allow icmpv6"
-            ip daddr ${any_lan_ip}                               jump input-lan-allow
-            iifname ${any_container_if}                          jump input-container-allow
-            ${acceptTailscale}
-            counter name input_allow_nomatch #                    drop
-        	}
-
-          chain input-lan-allow {
-            # Acccept TCP LAN services
-            tcp dport ${ssh}      counter name lan_ssh           accept 
-            # lxd container admin
-            ${incus_lan_rules}
-
-            # TODO: tighten this up by restricting source ip or enumerating ports
-            tcp dport ${exporters}                               accept
-
-            # udp: traceroute
-        		udp dport { 33434-33524 }                            accept
-            counter name lan_nomatch                             drop
+          	tcp flags syn / fin,syn,rst,ack \
+                  log prefix "refused connection: " level info \
+                  counter name input_refused
+             counter name input_nomatch #                          drop
           }
 
-          chain input-container-allow {
-            # Acccept TCP services from containers
-            tcp dport ${https}    counter name ctr_https         accept 
-            tcp dport ${http}     counter name ctr_http          accept 
-            tcp dport ${ssh}      counter name ctr_ssh           accept 
-
-            # tcp: dns
-            tcp dport ${dnsv4}                                   accept
-
-            # udp: dns, dhcp, traceroute
-            udp dport { ${dnsv4}, 67-68, 33434-33524 }           accept
-
-            # mdns from containers
-            ip daddr "224.0.0.251"  udp dport ${mdns}            accept comment mdns
-            ${ifv6} ip6 daddr "ff02::fb"  udp dport ${mdns}      accept comment mdns
-        		${ifv6} ip6 daddr fe80::/64   udp dport 546          accept comment DHCPv6 
-            counter name input_ctr_nomatch                       drop
+          chain input-allow {
+             # lockout prevention: allow ssh from anywhere - even if interface names change
+             tcp dport ${ssh} counter name lan_ssh                accept
+             # dhcp, all interfaces
+             udp dport ${dhcp_ports}                              accept
+             # This icmp rule may be too loose, but ok for trusted lan and containers
+             ip protocol 1                                        accept comment "allow icmp"
+             ${ifv6} meta l4proto 58                              accept comment "allow icmpv6"
+             ip daddr ${any_lan_ip}                               jump input-lan-allow
+             iifname ${any_container_if}                          jump input-container-allow
+             ${acceptTailscale}
+             counter name input_allow_nomatch #                    drop
           }
 
-          # Default policy is accept so this chain isn't required if empty.
-          # But I want it here so I can add logging rules
-          # chain output {
-        	# type filter hook output priority 0;                  policy accept;
-          # }
+           chain input-lan-allow {
+             # Acccept TCP LAN services
+             tcp dport ${ssh}      counter name lan_ssh           accept
+             # lxd container admin
+             ${incus_lan_rules}
+
+             # TODO: tighten this up by restricting source ip or enumerating ports
+             tcp dport ${exporters}                               accept
+
+             # udp: traceroute
+          	udp dport { 33434-33524 }                            accept
+             counter name lan_nomatch                             drop
+           }
+
+           chain input-container-allow {
+             # Acccept TCP services from containers
+             tcp dport ${https}    counter name ctr_https         accept
+             tcp dport ${http}     counter name ctr_http          accept
+             tcp dport ${ssh}      counter name ctr_ssh           accept
+
+             # tcp: dns
+             tcp dport ${dnsv4}                                   accept
+
+             # udp: dns, dhcp, traceroute
+             udp dport { ${dnsv4}, 67-68, 33434-33524 }           accept
+
+             # mdns from containers
+             ip daddr "224.0.0.251"  udp dport ${mdns}            accept comment mdns
+             ${ifv6} ip6 daddr "ff02::fb"  udp dport ${mdns}      accept comment mdns
+          	${ifv6} ip6 daddr fe80::/64   udp dport 546          accept comment DHCPv6
+             counter name input_ctr_nomatch                       drop
+           }
+
+           # Default policy is accept so this chain isn't required if empty.
+           # But I want it here so I can add logging rules
+           # chain output {
+          # type filter hook output priority 0;                  policy accept;
+           # }
         '';
       };
 
@@ -244,7 +257,7 @@ in
       # dnat rules for forwarding ports into containers are generated by nixos nspawn
       # There aren't quite enough hooks in the nixos-container/systemd-nspawn wrappers
       # to overwrite those. We just make sure that they are in different tables,
-      # and any ports that are forwarded are accepted in the input rules above. 
+      # and any ports that are forwarded are accepted in the input rules above.
       "container-nat" = {
         family = "ip";
         content = ''
@@ -258,7 +271,7 @@ in
           chain post {
             # priority 100
           	type nat hook postrouting priority srcnat; policy accept;
-          
+
             # source nat from containers out through primary lan interface
             ${bridge_SNAT_out}
           }

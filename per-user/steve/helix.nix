@@ -1,18 +1,15 @@
-{
-  config,
-  pkgs,
-  ...
-}: {
+{pkgs, ...}: {
   programs.helix = {
     enable = true;
 
     defaultEditor = true;
     extraPackages = with pkgs; [
       #bash-language-server
+      alejandra # nix formatter
       docker-compose-language-service
       marksman
-      nil
-      nixpkgs-fmt
+      nil # nix LSP
+      #nixpkgs-fmt
       taplo
       taplo-lsp
       vscode-langservers-extracted

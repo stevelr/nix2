@@ -29,136 +29,137 @@
     };
   };
 
-  outputs = { self, nixpkgs, nixpkgs-unstable, nix-darwin, flake-checker, home-manager, ... } @ inputs:
-    let
-      inherit (self) outputs;
-      supportedSystems = [
-        "aarch64-linux"
-        "x86_64-linux"
-        "aarch64-darwin"
-        #"x86_64-darwin"
-      ];
+  outputs = {
+    self,
+    nixpkgs,
+    nixpkgs-unstable,
+    nix-darwin,
+    flake-checker,
+    home-manager,
+    ...
+  } @ inputs: let
+    inherit (self) outputs;
 
-      forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
+    supportedSystems = [
+      "aarch64-linux"
+      "x86_64-linux"
+      "aarch64-darwin"
+      #"x86_64-darwin"
+    ];
 
-      commonModules = [
-        ./modules/common.nix
-      ];
+    forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
 
-      mkSystem =
-        { system, modules ? [ ], }:
-        nixpkgs.lib.nixosSystem {
-          #inherit system;
-          specialArgs = { inherit inputs outputs; };
-          modules =
-            [
-              # import the overlays module
-              (import ./overlays { inherit inputs; })
+    commonModules = [
+      ./modules/common.nix
+    ];
 
-              # common modules
-              # ...
-            ]
-            ++ modules;
-        };
+    mkSystem = {
+      system,
+      modules ? [],
+    }:
+      nixpkgs.lib.nixosSystem {
+        #inherit system;
+        specialArgs = {inherit inputs outputs;};
+        modules =
+          [
+            # import the overlays module
+            (import ./overlays {inherit inputs;})
+
+            # common modules
+            # ...
+          ]
+          ++ modules;
+      };
+  in {
+    # Your custom packages
+    # Accessible through 'nix build', 'nix shell', etc
+    packages = forAllSystems (system: let
+      pkgs = nixpkgs.legacyPackages.${system};
     in
-    {
-      # Your custom packages
-      # Accessible through 'nix build', 'nix shell', etc
-      packages = forAllSystems (system:
-        let pkgs = nixpkgs.legacyPackages.${system};
-        in import ./pkgs { inherit pkgs; });
+      import ./pkgs {inherit pkgs;});
 
-      # custom packages and modificatios, exported as overlays
-      overlays = import ./overlays { inherit inputs; };
-      # overlays.default = final: prev: (import ./overlays inputs self) final prev;
+    # custom packages and modificatios, exported as overlays
+    overlays = import ./overlays {inherit inputs;};
+    # overlays.default = final: prev: (import ./overlays inputs self) final prev;
 
-      # Formatter for your nix files, available through 'nix fmt'
-      formatter = forAllSystems (system: nixpkgs.legacyPackages.${system}.nil);
+    # Formatter for your nix files, available through 'nix fmt'
+    formatter = forAllSystems (system: nixpkgs.legacyPackages.${system}.nil);
 
-      # reusable modules - include each subdirectory
-      nixosModules = builtins.listToAttrs (
-        map
-          (name: {
-            inherit name;
-            value = import (./modules + "/${name}");
-          })
-          (builtins.attrNames (builtins.readDir ./modules))
-      );
+    # reusable modules - include each subdirectory
+    nixosModules = builtins.listToAttrs (
+      map
+      (name: {
+        inherit name;
+        value = import (./modules + "/${name}");
+      })
+      (builtins.attrNames (builtins.readDir ./modules))
+    );
 
-      # Reusable home-manager modules you might want to export
-      # These are usually stuff you would upstream into home-manager
-      #homeManagerModules = import ./modules/home-manager;
-
-      darwinConfigurations =
-        let
-          home-manager = inputs.home-manager.darwinModules.home-manager;
-        in
-        {
-          comet = inputs.nix-darwin.lib.darwinSystem {
-            specialArgs = { };
-            modules =
-              [
-                ./per-host/comet
-                home-manager
-                {
-                  home-manager = {
-                    useGlobalPkgs = true;
-                    users."steve" = import ./per-user/steve;
-                  };
-                }
-              ]
-              ++ commonModules;
-          };
-        };
-
-      # NixOS configuration entrypoint
-      # Available through 'nixos-rebuild --flake .#your-hostname'
-      nixosConfigurations =
-        let
-          home-manager = inputs.home-manager.nixosModules.home-manager;
-        in
-        {
-          pangea = mkSystem {
-            system = "x86_64-linux";
-            modules =
-              [
-                ./per-host/pangea
-                home-manager
-                {
-                  home-manager = {
-                    useGlobalPkgs = true;
-                    backupFileExtension = "backup";
-                    users.steve = import ./per-user/steve;
-                  };
-                }
-              ]
-              ++ commonModules;
-          };
-
-          fake = mkSystem {
-            system = "x86_64-linux";
-            modules =
-              [
-                ./per-host/fake
-              ]
-              ++ commonModules;
-          };
-
-          aster = mkSystem {
-            system = "aarch64-linux";
-            modules =
-              [
-                ./per-host/aster
-                home-manager
-                {
-                  home-manager = {
-                    useGlobalPkgs = true;
-                    users.steve = import ./per-user/steve;
-                  };
-                }
-              ]
-              ++ commonModules;
-          };
-        };
+    darwinConfigurations = let
+      home-manager = inputs.home-manager.darwinModules.home-manager;
+    in {
+      comet = inputs.nix-darwin.lib.darwinSystem {
+        specialArgs = {};
+        modules =
+          [
+            ./per-host/comet
+            (home-manager {
+              home-manager = {
+                useGlobalPkgs = true;
+                backupFileExtension = "backup";
+                users.steve = import ./per-user/steve;
+              };
+            })
+          ]
+          ++ commonModules;
+      };
     };
+
+    # NixOS configuration entrypoint
+    # Available through 'nixos-rebuild --flake .#your-hostname'
+    nixosConfigurations = let
+      home-manager = inputs.home-manager.nixosModules.home-manager;
+    in {
+      pangea = mkSystem {
+        system = "x86_64-linux";
+        modules =
+          [
+            ./per-host/pangea
+            # (home-manager {
+            #   home-manager = {
+            #     useGlobalPkgs = true;
+            #     backupFileExtension = "backup";
+            #     users.steve = import ./per-user/steve;
+            #   };
+            # })
+          ]
+          ++ commonModules;
+      };
+
+      fake = mkSystem {
+        system = "x86_64-linux";
+        modules =
+          [
+            ./per-host/fake
+          ]
+          ++ commonModules;
+      };
+
+      aster = mkSystem {
+        system = "aarch64-linux";
+        modules =
+          [
+            ./per-host/aster
+            (home-manager {
+              home-manager = {
+                useGlobalPkgs = true;
+                backupFileExtension = "backup";
+                users.steve = import ./per-user/steve;
+              };
+            })
+          ]
+          ++ commonModules;
+      };
+    };
+  };
 }

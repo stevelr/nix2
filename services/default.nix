@@ -630,6 +630,7 @@ in {
       prometheus = {
         uid = 4011;
         gid = 4011;
+        extraGroups = ["exporters"];
       };
       loki = {
         uid = 4012;

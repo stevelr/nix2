@@ -15,7 +15,7 @@ comet:
 
 pangea:
     # impure required because of assertions on disk paths in /dev/disk/by-id
-    sudo nixos-rebuild --cores 4 --impure switch --flake .#pangea --show-trace
+    sudo nixos-rebuild --cores 4 --upgrade --impure switch --flake .#pangea --show-trace
 
 aster:
     sudo nixos-rebuild --refresh --cores 4 switch --flake .#aster --show-trace
