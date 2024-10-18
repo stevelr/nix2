@@ -87,7 +87,7 @@
   '';
 in {
   options.my.media = mkOption {
-    type = types.nullOr (types.submodule {
+    type = types.submodule {
       options = {
         enable = mkOption {
           type = types.bool;
@@ -162,8 +162,8 @@ in {
           default = null;
         };
       };
-    });
-    default = null;
+    };
+    default = {};
     description = "media server config and components";
   };
 

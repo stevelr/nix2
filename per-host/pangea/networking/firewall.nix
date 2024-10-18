@@ -1,12 +1,10 @@
 { config, lib, ... }:
 let
   giteaCfg = config.my.containers.gitea; # gitea container cfg
-  gitea_ip = giteaCfg.address; # gitea container on br0
   vaultCfg = config.my.containers.vault;
   vectorCfg = config.my.containers.vector;
-  tsCfg = config.my.service.tailscale;
+  tsCfg = config.my.services.tailscale;
   clickhouseCfg = config.my.containers.clickhouse;
-  nginx_ip = config.my.containers.nginx.address;
   bridges = config.my.managedNets; # list of internal bridges
 
   iface1 = config.my.hostNets.hostlan1;
@@ -45,7 +43,6 @@ let
   dhcp_ports = "{ 67, 68 }";
   vaultCls = toString vaultCfg.settings.clusterPort;
   gitea_pub_ssh = toString giteaCfg.settings.hostSsh;
-  gitea_int_ssh = toString giteaCfg.settings.ssh;
 
   # DNAT ports forwarded to containers
   forwardedPorts = "{ ${http}, ${https}, ${gitea_pub_ssh}, ${vaultCls}, ${chHttp}, ${chTcp}, ${vectorApi} }";

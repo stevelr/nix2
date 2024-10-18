@@ -2,12 +2,15 @@
 { config
 , pkgs
 , lib
+, outputs
 , ...
 }:
 let
   inherit (builtins) pathExists;
   inherit (lib) optional attrNames listToAttrs filterAttrs;
-  inherit (pkgs.myLib) mkUsers;
+
+  mkUsers = pkgs.myLib.mkUsers config.my.userids;
+  mkGroups = pkgs.myLib.mkGroups config.my.userids;
 
   # exporterUsers = (listToAttrs (map
   #   (exp: {
@@ -266,7 +269,7 @@ in
 
     # enable all users and groups on pangea
 
-    users.users = lib.recursiveUpdate (mkUsers config.my.userids [ "steve" "user" ]) {
+    users.users = lib.recursiveUpdate (mkUsers [ "steve" "user" ]) {
       # extra user attributes
       steve = {
         group = "users";
@@ -276,7 +279,7 @@ in
         extraGroups = [ "podman" "incus" ];
       };
     }; # // exporterUsers;
-    #users.groups = mkGroups config.my.userids [];
+    users.groups = mkGroups [ "exporters" ];
 
     services.ntp = {
       enable = true;
@@ -453,7 +456,7 @@ in
         file
         gnupg
         helix
-        hello-custom # test overlays
+        outputs.packages.${pkgs.system}."hello-world"
         htop
         hydra-check
         iotop
@@ -484,7 +487,7 @@ in
         xorg.xauth # needed for X11Forwarding
         xorg.xeyes # for testing X connections
       ]
-      ++ (import ./handy-tools.nix { inherit pkgs; }).full;
+      ++ (import ../../modules/handy-tools.nix { inherit pkgs; }).full;
 
     environment.variables = rec {
       # Use absolute paths for these, in case some usage does not use PATH.
@@ -501,6 +504,7 @@ in
 
     nix = {
       settings = {
+        allowed-impure-host-deps = [ "/dev/disk" ];
         auto-optimise-store = true;
         experimental-features = [ "nix-command" "flakes" ];
       };

@@ -203,7 +203,7 @@ in
         loader = {
           grub = {
             enable = true;
-            version = 20.0;
+            #version = 2;
             copyKernels = true;
             efiSupport = true;
             zfsSupport = true;

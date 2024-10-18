@@ -395,7 +395,7 @@ in {
         type = types.attrsOf (types.submodule {
           options = containerOptions;
         });
-        default = {enable = false;};
+        default = {};
       };
 
       pre = {
@@ -525,6 +525,7 @@ in {
                   };
                 };
               };
+              default = {};
             };
 
             tailscale = mkOption {
@@ -538,7 +539,7 @@ in {
                   };
                 };
               };
-              default = {enable = false;};
+              default = {};
               description = "tailscale client daemon options";
             };
 
@@ -565,9 +566,11 @@ in {
                   };
                 };
               };
+              default = {};
             };
           };
         };
+        default = {};
       };
       # files = mkOption {
       #   type = types.attrs;

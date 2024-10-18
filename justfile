@@ -8,6 +8,9 @@ alias rb := rebuild
 _default:
     just --list
 
+f:
+    sudo nixos-rebuild build --impure --flake .#fake --show-trace
+
 # rebuild nixos for current host
 rebuild:
     just {{hostname}}
@@ -16,7 +19,10 @@ comet:
     darwin-rebuild switch --flake .#comet
 
 pangea:
-    sudo nixos-rebuild --cores 4 build --flake .#pangea --show-trace
+    sudo nixos-rebuild --cores 4 \
+        --impure \
+        build \
+        --flake .#pangea --show-trace
     
 b:
     nix-build --log-format internal-json -v |& nom --json

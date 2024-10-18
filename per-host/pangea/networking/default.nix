@@ -138,7 +138,7 @@ in
 
   services.kea =
     let
-      keaCtrlCfg = config.my.service.kea.control-agent;
+      keaCtrlCfg = config.my.services.kea.control-agent;
       dhcp4Zone = snet: {
         id = snet.dhcp.id;
         interface = snet.name;
@@ -222,7 +222,7 @@ in
 
   services.tailscale = 
   let
-    cfg = config.my.service.tailscale;
+    cfg = config.my.services.tailscale;
   in {
     enable = cfg.enable;
     port = cfg.port;
