@@ -120,17 +120,23 @@
         {
           pangea = mkSystem {
             system = "x86_64-linux";
-            #hostname = "pangea";
             modules =
               [
                 ./per-host/pangea
+                home-manager
+                {
+                  home-manager = {
+                    useGlobalPkgs = true;
+                    backupFileExtension = "backup";
+                    users.steve = import ./per-user/steve;
+                  };
+                }
               ]
               ++ commonModules;
           };
 
           fake = mkSystem {
             system = "x86_64-linux";
-            #hostname = "fake";
             modules =
               [
                 ./per-host/fake
@@ -140,7 +146,6 @@
 
           aster = mkSystem {
             system = "aarch64-linux";
-            #hostname = "aster";
             modules =
               [
                 ./per-host/aster
