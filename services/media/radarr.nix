@@ -2,27 +2,26 @@
 {
   config,
   pkgs,
+  unstable ? pkgs.unstable,
   lib ? pkgs.lib,
 }: {
   mkRadarrService = cfg: let
     dataHome = "${cfg.storage.localBase}/data";
     cacheHome = "${cfg.storage.localBase}/cache";
     configHome = "${cfg.storage.localBase}/config";
-
-    logDir = "${cfg.storage.localBase}/log/radarr";
   in {
     services = {
       radarr = {
         enable = cfg.enable && (builtins.elem "radarr" cfg.backends);
-        description = "radarr service (${pkgs.radarr.pname}-${pkgs.radarr.version})";
+        description = "radarr service (${unstable.radarr.pname}-${unstable.radarr.version})";
         documentation = ["man:radarr(1)"];
         wants = ["network-online.target"];
         after = ["network.target"];
         wantedBy = ["multi-user.target"];
 
-        path = with pkgs; [
-          bash
-          radarr
+        path = [
+          pkgs.bash
+          unstable.radarr
         ];
 
         environment = {
@@ -54,7 +53,7 @@
               ${ensureDir "${configHome}/Radarr" "700"}
             '';
           in "!${preStartScript}";
-          ExecStart = "${pkgs.radarr}/bin/Radarr";
+          ExecStart = "${unstable.radarr}/bin/Radarr";
         };
       };
     };

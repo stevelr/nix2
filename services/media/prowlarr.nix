@@ -2,6 +2,7 @@
 {
   config,
   pkgs,
+  unstable ? pkgs.unstable,
   lib ? pkgs.lib,
 }: {
   mkProwlarrService = cfg: let
@@ -13,15 +14,15 @@
     services = {
       prowlarr = {
         enable = cfg.enable && (builtins.elem "prowlarr" cfg.backends);
-        description = "prowlarr service (${pkgs.prowlarr.pname}-${pkgs.prowlarr.version})";
+        description = "prowlarr service (${unstable.prowlarr.pname}-${unstable.prowlarr.version})";
         documentation = ["man:prowlarr(1)"];
         wants = ["network-online.target"];
         after = ["network.target"];
         wantedBy = ["multi-user.target"];
 
-        path = with pkgs; [
-          bash
-          prowlarr
+        path = [
+          pkgs.bash
+          unstable.prowlarr
         ];
 
         environment = {
@@ -53,7 +54,7 @@
               ${ensureDir "${configHome}/Prowlarr" "700"}
             '';
           in "!${preStartScript}";
-          ExecStart = "${pkgs.prowlarr}/bin/Prowlarr";
+          ExecStart = "${unstable.prowlarr}/bin/Prowlarr";
         };
       };
     };

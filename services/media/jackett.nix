@@ -2,6 +2,7 @@
 {
   config,
   pkgs,
+  unstable ? pkgs.unstable,
   lib ? pkgs.lib,
 }: {
   mkJackettService = cfg: let
@@ -12,15 +13,15 @@
     services = {
       jackett = {
         enable = cfg.enable && (builtins.elem "jackett" cfg.backends);
-        description = "jackett service (${pkgs.jackett.pname}-${pkgs.jackett.version})";
+        description = "jackett service (${unstable.jackett.pname}-${unstable.jackett.version})";
         documentation = ["man:jackett(1)"];
         wants = ["network-online.target"];
         after = ["network.target"];
         wantedBy = ["multi-user.target"];
 
-        path = with pkgs; [
-          bash
-          jackett
+        path = [
+          pkgs.bash
+          unstable.jackett
         ];
 
         environment = {
@@ -53,7 +54,7 @@
             '';
           in "!${preStartScript}";
           ExecStart = ''
-            ${pkgs.jackett}/bin/jackett \
+            ${unstable.jackett}/bin/jackett \
               --Port ${toString config.my.ports.jackett.port}
           '';
         };

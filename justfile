@@ -24,9 +24,6 @@ pangea:
         build \
         --flake .#pangea --show-trace
     
-b:
-    nix-build --log-format internal-json -v |& nom --json
-
 aster:
     #sudo nixos-rebuild switch --flake .#aster
     sudo nixos-rebuild --refresh --cores 4 switch --flake .#aster --show-trace

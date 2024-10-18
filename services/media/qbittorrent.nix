@@ -2,6 +2,7 @@
 {
   config,
   pkgs,
+  unstable ? pkgs.unstable,
   lib ? pkgs.lib,
 }: {
   # qbittorrent wrapper
@@ -20,12 +21,11 @@
     downloadDir = pkgs.myLib.valueOr cfg.storage.downloads "${cfg.storage.localBase}/downloads";
     webUiPort = config.my.ports.qbittorrent.port;
     vpnCfg = config.my.vpnNamespaces.${cfg.namespace};
-    myPkg = pkgs.qbittorrent-nox;
   in {
     services = {
       qbittorrent = {
         enable = cfg.enable && (builtins.elem "qbittorrent" cfg.backends);
-        description = "qBittorrent (${myPkg.pname}-${myPkg.version})";
+        description = "qBittorrent (${unstable.qbittorrent-nox.pname}-${unstable.qbittorrent-nox.version})";
         documentation = ["man:qbittorrent-nox(1)"];
         wants = ["network-online.target"];
         after = ["network.target"]; # ? nss-lookup.target
@@ -41,7 +41,7 @@
 
         path = [
           pkgs.bash
-          myPkg
+          unstable.qbittorrent-nox
         ];
 
         serviceConfig = {
@@ -93,7 +93,7 @@
               fi
             '';
           in "!${preStartScript}";
-          ExecStart = "${pkgs.qbittorrent-nox}/bin/qbittorrent-nox";
+          ExecStart = "${unstable.qbittorrent-nox}/bin/qbittorrent-nox";
         };
       };
     };

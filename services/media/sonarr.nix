@@ -13,26 +13,26 @@
 {
   config,
   pkgs,
+  unstable ? pkgs.unstable,
   lib ? pkgs.lib,
 }: {
   mkSonarrService = cfg: let
     dataHome = "${cfg.storage.localBase}/data";
     cacheHome = "${cfg.storage.localBase}/cache";
     configHome = "${cfg.storage.localBase}/config";
-    logDir = "${cfg.storage.localBase}/log/sonarr";
   in {
     services = {
       sonarr = {
         enable = cfg.enable && (builtins.elem "sonarr" cfg.backends);
-        description = "sonarr service (${pkgs.sonarr.pname}-${pkgs.sonarr.version})";
+        description = "sonarr service (${pkgs.sonarr.pname}-${unstable.sonarr.version})";
         documentation = ["man:sonarr(1)"];
         wants = ["network-online.target"];
         after = ["network.target"];
         wantedBy = ["multi-user.target"];
 
-        path = with pkgs; [
-          bash
-          sonarr
+        path = [
+          pkgs.bash
+          unstable.sonarr
         ];
 
         environment = {
@@ -64,7 +64,7 @@
               ${ensureDir "${configHome}/Sonarr" "700"}
             '';
           in "!${preStartScript}";
-          ExecStart = "${pkgs.sonarr}/bin/Sonarr";
+          ExecStart = "${unstable.sonarr}/bin/Sonarr";
         };
       };
     };

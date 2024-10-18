@@ -2,6 +2,7 @@
 {
   config,
   pkgs,
+  unstable ? pkgs.unstable,
   lib ? pkgs.lib,
 }: {
   # https://jellyfin.org/docs/general/administration/configuration/
@@ -15,7 +16,7 @@
     services = {
       jellyfin = {
         enable = cfg.enable && (builtins.elem "jellyfin" cfg.backends);
-        description = "jellyfin service (${pkgs.jellyfin.pname}-${pkgs.jellyfin.version})";
+        description = "jellyfin service (${unstable.jellyfin.pname}-${unstable.jellyfin.version})";
         documentation = ["man:jellyfin(1)"];
         # this service runs inside the container,
         # and the container uses systemd after/requires/bindsTo to depend on the vpn service
@@ -23,11 +24,11 @@
         after = ["network.target"];
         wantedBy = ["multi-user.target"];
 
-        path = with pkgs; [
-          bash
-          jellyfin-ffmpeg
-          jellyfin
-          jellyfin-web
+        path = [
+          pkgs.bash
+          unstable.jellyfin-ffmpeg
+          unstable.jellyfin
+          unstable.jellyfin-web
           #libva-utils # not sure if needed
         ];
 
@@ -36,7 +37,7 @@
           JELLYFIN_CONFIG_DIR = configDir;
           JELLYFIN_CACHE_DIR = cacheDir;
           JELLYFIN_LOG_DIR = logDir;
-          JELLYFIN_WEB_DIR = "${pkgs.jellyfin-web}/share/jellyfin-web";
+          JELLYFIN_WEB_DIR = "${unstable.jellyfin-web}/share/jellyfin-web";
           TZ = config.my.containerCommon.timezone; # shouold be UTC
         };
 
@@ -63,7 +64,7 @@
               ${ensureDir "${logDir}" "700"}
             '';
           in "!${preStartScript}";
-          ExecStart = "${pkgs.jellyfin}/bin/jellyfin";
+          ExecStart = "${unstable.jellyfin}/bin/jellyfin";
         };
       };
     };

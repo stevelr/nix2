@@ -1,12 +1,13 @@
 # services/media/default.nix
 #
-# TODO (1): - audiobookshelf not working yet
 # TODO (1): - additional firwall rules
 #   for incoming (10.2.x.x network)
 #     allow established,related connections
 #     allow port forwarding to qbt listening port
-#     block 22, 80, 443, qbt
 #     block incomoing (ct state new or unknown) from 10.2.x to all other ports
+#     note: 80,443,2022 only listening on 192 interface
+#       so only backend services are relevant
+#
 # TODO (2): test jellyfin gpu configuration
 # TODO (3): health check and recovery services
 #       (1) health check - either as separate service or ExecStartPost
@@ -21,6 +22,7 @@
 {
   config,
   pkgs,
+  #unstable ? pkgs.unstable,
   lib,
   ...
 }: let
@@ -44,11 +46,9 @@
   # params:
   #   host: hostname fqdn, such as "jellyfin.myhost.org"
   #   port: integer port of backend service
-  # defaults includes
-  #      proxy_http_version      1.1;
-  #      proxy_set_header        Upgrade $http_upgrade;   # for websockets
-  #      proxy_set_header        Connection "upgrade";    # for websockets
 
+  # websocket headers ("Upgrade" and "Connection") required for audiobookshelf
+  # included in all backends for simplicity
   serverConfig = name: port: ''
     server {
       listen                    ${nsCfg.veNsIp4}:80;
@@ -65,6 +65,9 @@
         proxy_set_header        X-Real-IP $remote_addr;
         proxy_set_header        X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header        X-Forwarded-Proto $scheme;
+        proxy_set_header        Upgrade $http_upgrade;
+        proxy_set_header        Connection "upgrade";
+        proxy_http_version      1.1;
       }
     }
   '';
@@ -250,7 +253,6 @@ in {
           serverTokens = false;
           sslProtocols = "TLSv1.3";
           clientMaxBodySize = "10g"; # allow larger post sizes
-          statusPage = true; # enable http://127.0.0.1/nginx_status
 
           appendConfig = ''
             worker_processes 4;
@@ -380,7 +382,7 @@ in {
 
         environment.variables.TZ = config.my.containerCommon.timezone;
 
-        system.stateVersion = config.my.containerCommon.stateVersion;
+        system.stateVersion = "24.11"; # config.my.containerCommon.stateVersion;
       };
     };
   };

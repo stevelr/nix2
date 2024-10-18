@@ -4,6 +4,7 @@
   config,
   pkgs,
   lib,
+  outputs,
   ...
 }: let
   inherit (pkgs.myLib) mkUsers mkGroups;
@@ -289,21 +290,25 @@ in {
 
     # List packages installed in system profile. To search, run:
     # $ nix search wget
-    environment.systemPackages = with pkgs; [
-      curl
-      git
-      helix
-      just
-      jq
-      lsof
-      ripgrep
-      starship
-      tailscale
-      vault-bin
-      vim
-      wget
-      wireguard-tools
-    ];
+    environment.systemPackages = with pkgs;
+      [
+        curl
+        git
+        helix
+        just
+        jq
+        lsof
+        ripgrep
+        starship
+        tailscale
+        vault-bin
+        vim
+        wget
+        wireguard-tools
+      ]
+      ++ (with outputs.packages.${system}; [
+        hello-world
+      ]);
     environment.homeBinInPath = true;
 
     # Some programs need SUID wrappers, can be configured further or are

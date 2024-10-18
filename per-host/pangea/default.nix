@@ -1,17 +1,16 @@
 # Options specific to this particular host machine.
-{ config
-, pkgs
-, lib
-, outputs
-, ...
-}:
-let
+{
+  config,
+  pkgs,
+  lib,
+  outputs,
+  ...
+}: let
   inherit (builtins) pathExists;
   inherit (lib) optional attrNames listToAttrs filterAttrs;
 
   mkUsers = pkgs.myLib.mkUsers config.my.userids;
   mkGroups = pkgs.myLib.mkGroups config.my.userids;
-
   # exporterUsers = (listToAttrs (map
   #   (exp: {
   #     name = exp.user;
@@ -29,8 +28,7 @@ let
   #   })
   #   (filter (v: v.enable && v.group != "exporters") (attrValues config.services.prometheus.exporters))
   # ));
-in
-{
+in {
   imports =
     [
       ./zfs
@@ -62,14 +60,12 @@ in
           main = 4;
           swap = 5;
         };
-        pools =
-          let
-            id = "jwr9us";
-          in
-          {
-            boot.name = "boot-${id}";
-            main.name = "main-${id}";
-          };
+        pools = let
+          id = "jwr9us";
+        in {
+          boot.name = "boot-${id}";
+          main.name = "main-${id}";
+        };
         usersZvolsForVMs = [
           {
             id = "1";
@@ -269,17 +265,17 @@ in
 
     # enable all users and groups on pangea
 
-    users.users = lib.recursiveUpdate (mkUsers [ "steve" "user" ]) {
+    users.users = lib.recursiveUpdate (mkUsers ["steve" "user"]) {
       # extra user attributes
       steve = {
         group = "users";
-        extraGroups = [ "wheel" "audio" "video" "podman" "incus-admin" ];
+        extraGroups = ["wheel" "audio" "video" "podman" "incus-admin"];
       };
       user = {
-        extraGroups = [ "podman" "incus" ];
+        extraGroups = ["podman" "incus"];
       };
     }; # // exporterUsers;
-    users.groups = mkGroups [ "exporters" ];
+    users.groups = mkGroups ["exporters"];
 
     services.ntp = {
       enable = true;
@@ -315,30 +311,30 @@ in
     # For each normal user, give it its own sub-directories under /mnt/scratch/home/ and
     # /var/tmp/home/.  This is especially useful for a user to place large dispensable things that
     # it wants to be excluded from backups.
-    systemd.tmpfiles.packages =
-      let
-        mkTmpfilesDirPkg = base:
-          (
-            pkgs.myLib.tmpfiles.mkDirPkg'
-              {
-                ${base} = {
-                  user = "root";
-                  group = "root";
-                  mode = "0755";
-                };
-              }
-              (listToAttrs (map
-                (userName: {
-                  name = userName;
-                  value = {
-                    user = userName;
-                    group = "users";
-                    mode = "0700";
-                  };
-                })
-                (attrNames (filterAttrs (n: v: v.isNormalUser) config.users.users))))
-          ).pkg;
-      in
+    systemd.tmpfiles.packages = let
+      mkTmpfilesDirPkg = base:
+        (
+          pkgs.myLib.tmpfiles.mkDirPkg'
+          {
+            ${base} = {
+              user = "root";
+              group = "root";
+              mode = "0755";
+            };
+          }
+          (listToAttrs (map
+            (userName: {
+              name = userName;
+              value = {
+                user = userName;
+                group = "users";
+                mode = "0700";
+              };
+            })
+            (attrNames (filterAttrs (n: v: v.isNormalUser) config.users.users))))
+        )
+        .pkg;
+    in
       map mkTmpfilesDirPkg [
         "/var/tmp/home"
       ];
@@ -349,19 +345,19 @@ in
       extraRules = [
         # allow users in group wheel to run nixos-rebuild, with any args, without password
         {
-          groups = [ "wheel" ];
+          groups = ["wheel"];
           commands = with pkgs; [
             {
               command = "${nixos-rebuild}/bin/nixos-rebuild";
-              options = [ "SETENV" "NOPASSWD" ];
+              options = ["SETENV" "NOPASSWD"];
             }
             {
               command = "${systemd}/bin/systemctl";
-              options = [ "SETENV" "NOPASSWD" ];
+              options = ["SETENV" "NOPASSWD"];
             }
             {
               command = "ALL";
-              options = [ "SETENV" ];
+              options = ["SETENV"];
             }
           ];
         }
@@ -403,17 +399,16 @@ in
       git = {
         enable = true;
         config = {
-          safe.directory =
-            let
-              safeDirs = [ "/etc/nixos" "/etc/nixos/users/dotfiles" ];
-              # Only needed because newer Git versions changed `safe.directory` handling to be more
-              # strict or something.  Unsure if the consequence of now needing this was
-              # unintentional of them.  If it was unintentional, I suppose it's possible that future
-              # Git versions could fix to no longer need this.
-              safeDirsWithExplicitGitDir =
-                (map (d: d + "/.git") safeDirs)
-                ++ [ "/etc/nixos/.git/modules/users/dotfiles" ];
-            in
+          safe.directory = let
+            safeDirs = ["/etc/nixos" "/etc/nixos/users/dotfiles"];
+            # Only needed because newer Git versions changed `safe.directory` handling to be more
+            # strict or something.  Unsure if the consequence of now needing this was
+            # unintentional of them.  If it was unintentional, I suppose it's possible that future
+            # Git versions could fix to no longer need this.
+            safeDirsWithExplicitGitDir =
+              (map (d: d + "/.git") safeDirs)
+              ++ ["/etc/nixos/.git/modules/users/dotfiles"];
+          in
             safeDirs ++ safeDirsWithExplicitGitDir;
           transfer.credentialsInUrl = "die";
         };
@@ -456,7 +451,6 @@ in
         file
         gnupg
         helix
-        outputs.packages.${pkgs.system}."hello-world"
         htop
         hydra-check
         iotop
@@ -487,7 +481,10 @@ in
         xorg.xauth # needed for X11Forwarding
         xorg.xeyes # for testing X connections
       ]
-      ++ (import ../../modules/handy-tools.nix { inherit pkgs; }).full;
+      ++ (with outputs.packages.${system}; [
+        hello-world
+      ])
+      ++ (import ../../modules/handy-tools.nix {inherit pkgs;}).full;
 
     environment.variables = rec {
       # Use absolute paths for these, in case some usage does not use PATH.
@@ -504,12 +501,12 @@ in
 
     nix = {
       settings = {
-        allowed-impure-host-deps = [ "/dev/disk" ];
+        allowed-impure-host-deps = ["/dev/disk"];
         auto-optimise-store = true;
-        experimental-features = [ "nix-command" "flakes" ];
+        experimental-features = ["nix-command" "flakes"];
       };
 
-      nixPath = [ "/etc/nix/path" ];
+      nixPath = ["/etc/nix/path"];
 
       # This fixes nixpkgs (for e.g. "nix shell") to match the system nixpkgs
       # FIXME
@@ -557,7 +554,7 @@ in
       zfs.requestEncryptionCredentials = false; # Or could be a list of selected datasets.
 
       # enable dynamically installing systemd units. Needed by extra-container
-      extraSystemdUnitPaths = [ "/etc/systemd-mutable/system" ];
+      extraSystemdUnitPaths = ["/etc/systemd-mutable/system"];
 
       # # To have classic ptrace permissions (instead of restricted, which is the new default).
       # # Setting this to 0 enables ptracing non-child processes, e.g. attaching GDB to an existing
@@ -602,5 +599,4 @@ in
       nixos.includeAllModules = true;
     };
   };
-
 }

@@ -2,6 +2,7 @@
 {
   config,
   pkgs,
+  unstable ? pkgs.unstable,
   lib ? pkgs.lib,
 }: {
   mkAudiobookshelfService = cfg: let
@@ -12,15 +13,15 @@
     services = {
       audiobookshelf = {
         enable = cfg.enable && (builtins.elem "audiobookshelf" cfg.backends);
-        description = "audiobookshelf service (${pkgs.audiobookshelf.pname}-${pkgs.audiobookshelf.version})";
+        description = "audiobookshelf service (${unstable.audiobookshelf.pname}-${unstable.audiobookshelf.version})";
         documentation = ["man:audiobookshelf(1)"];
         wants = ["network-online.target"];
         after = ["network.target"];
         wantedBy = ["multi-user.target"];
 
-        path = with pkgs; [
-          bash
-          audiobookshelf
+        path = [
+          pkgs.bash
+          unstable.audiobookshelf
         ];
 
         environment = {
@@ -53,7 +54,7 @@
             '';
           in "!${preStartScript}";
           ExecStart = ''
-            ${pkgs.audiobookshelf}/bin/audiobookshelf \
+            ${unstable.audiobookshelf}/bin/audiobookshelf \
                --metadata ${dataHome}/audiobookshelf \
                --config ${configHome}/audiobookshelf \
                --port ${toString config.my.ports.audiobookshelf.port}
