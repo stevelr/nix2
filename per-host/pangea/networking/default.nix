@@ -57,10 +57,10 @@ in
   networking = {
     # enable/disable ipv6 on all interfaces
     enableIPv6 = useIpv6;
-    
+
     hostName = config.my.hostName;
     domain = config.my.hostDomain;
-    
+
     hostId = machineId; # required for zfs
 
     # install nftables but don't create a system-defined firewall
@@ -73,6 +73,13 @@ in
     resolvconf.enable = false;
     # if we do decide to use resolvconf, use systemd version not openresolv
     resolvconf.package = lib.mkForce pkgs.systemd;
+
+    timeServers = [
+      "0.us.pool.ntp.org"
+      "1.us.pool.ntp.org"
+      "2.us.pool.ntp.org"
+      "3.us.pool.ntp.org"
+    ];
   };
 
   # use systemd-networkd, rather than the legacy systemd.network 
@@ -165,7 +172,15 @@ in
           }
           {
             name = "ntp-servers";
-            data = toCsv config.networking.timeServers;
+            # kea requires addresses, not dns names here
+            # ips below are obtained from {0-2}.pool.us.ntp.org on 10/18/2024
+            data = toCsv [
+              "104.194.8.227"
+              "142.202.190.19"
+              "144.34.193.110"
+              "155.248.196.28"
+              "172.233.153.85"
+            ];
           }
         ];
         # DDNS is specific to this subnet (kea allows it to be set in global, shared-network, or subnet)
@@ -220,18 +235,19 @@ in
       };
     };
 
-  services.tailscale = 
-  let
-    cfg = config.my.services.tailscale;
-  in {
-    enable = cfg.enable;
-    port = cfg.port;
+  services.tailscale =
+    let
+      cfg = config.my.services.tailscale;
+    in
+    {
+      enable = cfg.enable;
+      port = cfg.port;
 
-    # authKeyFile = "/run/secrets/tailscale_key";
-    extraUpFlags = [];
-    extraSetFlags = [];
-    extraDaemonFlags = [];
-  };
+      # authKeyFile = "/run/secrets/tailscale_key";
+      extraUpFlags = [ ];
+      extraSetFlags = [ ];
+      extraDaemonFlags = [ ];
+    };
 
-    
+
 }
