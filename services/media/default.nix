@@ -1,13 +1,8 @@
 # services/media/default.nix
 #
-# TODO (1): - additional firwall rules
-#   for incoming (10.2.x.x network)
-#     allow established,related connections
-#     allow port forwarding to qbt listening port
-#     block incomoing (ct state new or unknown) from 10.2.x to all other ports
-#     note: 80,443,2022 only listening on 192 interface
-#       so only backend services are relevant
-#
+# TODO
+#    Qbittorrent has a nat-pmp setting in the ui. Does that mean I don't need to run the natpmp client to query the forwarded port?
+# TODO: browser-in-browser (?)
 # TODO (2): test jellyfin gpu configuration
 # TODO (3): health check and recovery services
 #       (1) health check - either as separate service or ExecStartPost
@@ -138,6 +133,13 @@ in {
           default = null;
           example = 2222;
         };
+        btListenPort = mkOption {
+          type = types.nullOr types.int;
+          description = "bittorrent listener port. will be opened in firewall";
+          default = null;
+          example = 8091;
+        };
+
         storage = mkOption {
           type = types.submodule {
             options = {
@@ -243,6 +245,10 @@ in {
           // radarr.services
           // sonarr.services;
 
+        # blockPorts =
+        #   concatStringsSep ","
+        #   (map (bk: toString config.my.ports.${bk}.port) cfg.backends);
+
         services.nginx = {
           enable = true;
           validateConfigFile = true;
@@ -311,9 +317,8 @@ in {
           lsof
           nmap
           helix
-          # a few of the tools use sqlite (v3)
-          sqlite
-          sqlite-utils
+          libnatpmp # TODO: move to qbittorrent
+          python3 # TODO: for testing natpmp
         ];
 
         environment.etc."resolv.conf".text = let

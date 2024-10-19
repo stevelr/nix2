@@ -7,13 +7,14 @@
   outputs,
   ...
 }: let
-  inherit (pkgs.myLib) mkUsers mkGroups;
   nginxIP = "10.55.0.15";
   mediaIP = "192.168.10.11";
   # where to forward incoming http traffic - either nginxIP or mediaIP
   activeHttp = mediaIP;
   hostDomain = "pasilla.net";
   fqdn = "aster.pasilla.net";
+  mkUsers = pkgs.myLib.mkUsers config.my.userids;
+  mkGroups = pkgs.myLib.mkGroups config.my.userids;
 in {
   imports = [
     ../../services
@@ -122,8 +123,8 @@ in {
 
         # hashicorp vault for secrets
         vault = let
-          apiPort = config.my.ports.vault.port;
-          clusterPort = config.my.ports.vaultCluster.port;
+          apiPort = config.my.ports.vault.apiPort;
+          clusterPort = config.my.ports.vault.clusterPort;
         in {
           enable = true;
           name = "vault";
@@ -162,12 +163,15 @@ in {
         mediaUserExtraConfig = {
           # groups should include 'wheel' if sudo is enabled
           extraGroups = ["media-group" "wheel" "video" "render"];
+          # TODO: remove python3 later?
           packages = with pkgs; [curl jq helix python3];
           openssh.authorizedKeys.keys = [
             "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFilbUTPgUrnInm3Nz2U0rE5oUCzx4uFgwGJYjZwmhpN user@aster"
           ];
         };
         sshPort = 2022;
+        # will be opened in firewall (tcp & udp). must be set in qbittorrent settings
+        btListenPort = 14641;
         storage = {
           hostBase = "/var/lib/media";
           localBase = "/media";
@@ -270,13 +274,37 @@ in {
     # Enable touchpad support (enabled default in most desktopManager).
     # services.xserver.libinput.enable = true;
 
-    users.users = lib.recursiveUpdate (mkUsers config.my.userids ["steve" "media" "nginx"]) {
-      steve = {
-        group = "users";
-        extraGroups = ["networkmanager" "wheel" "audio" "video"];
+    users.users =
+      lib.recursiveUpdate (mkUsers [
+        # interactive
+        "steve"
+        "user"
+        "media"
+        # services
+        "grafana"
+        "kea"
+        "nats"
+        "nginx"
+        "unbound"
+        "vault"
+      ]) {
+        steve = {
+          group = "users";
+          extraGroups = ["wheel" "audio" "video"];
+        };
       };
-    };
-    users.groups = mkGroups config.my.userids ["exporters" "media" "nginx" "media-group"];
+    users.groups = mkGroups [
+      "exporters"
+      "media"
+      "media-group"
+      # services
+      "grafana"
+      "kea"
+      "nats"
+      "nginx"
+      "unbound"
+      "vault"
+    ];
 
     programs.firefox.enable = true;
     programs.zsh.enable = true;
@@ -290,25 +318,31 @@ in {
 
     # List packages installed in system profile. To search, run:
     # $ nix search wget
-    environment.systemPackages = with pkgs;
-      [
-        curl
-        git
-        helix
-        just
-        jq
-        lsof
-        ripgrep
-        starship
-        tailscale
-        vault-bin
-        vim
-        wget
-        wireguard-tools
-      ]
-      ++ (with outputs.packages.${system}; [
-        hello-world
-      ]);
+    environment.systemPackages =
+      with pkgs;
+        [
+          curl
+          git
+          helix
+          just
+          jq
+          lsof
+          #hello-custom
+          ripgrep
+          starship
+          #tailscale
+          vim
+          wget
+          wireguard-tools
+        ]
+        ++ (with pkgs.unstable; [
+          novnc
+          vault-bin
+        ])
+      # ++ (with outputs.packages.${system}; [
+      #   hello-custom
+      # ]);
+      ;
     environment.homeBinInPath = true;
 
     # Some programs need SUID wrappers, can be configured further or are
@@ -326,7 +360,7 @@ in {
 
     services.tailscale = {
       enable = false;
-      port = 41641;
+      port = config.my.ports.tailscale.port;
       useRoutingFeatures = "both";
     };
 
@@ -353,7 +387,7 @@ in {
         allowedTCPPorts =
           [22 53]
           ++ (lib.optionals config.my.services.tailscale.enable [config.my.ports.tailscale.port])
-          ++ (lib.optionals config.my.containers.vault.enable [config.my.ports.vault.port config.my.ports.vaultCluster.port]);
+          ++ (lib.optionals config.my.containers.vault.enable [config.my.ports.vault.apiPort config.my.ports.vault.clusterPort]);
       };
 
       nftables = {

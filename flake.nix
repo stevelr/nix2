@@ -23,8 +23,8 @@
     # Home manager
     home-manager = {
       # use /home-manager to get stable release
-      #url = "github:nix-community/home-manager";
-      url = "https://github.com/nix-community/home-manager/archive/release-24.05.tar.gz";
+      url = "github:nix-community/home-manager";
+      #url = "https://github.com/nix-community/home-manager/archive/release-24.05.tar.gz";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
@@ -39,6 +39,7 @@
     ...
   } @ inputs: let
     inherit (self) outputs;
+    inherit (builtins) listToAttrs;
 
     supportedSystems = [
       "aarch64-linux"
@@ -70,6 +71,22 @@
           ]
           ++ modules;
       };
+
+    hmHomesForUsers = hm: users: [
+      hm
+      {
+        home-manager = {
+          useGlobalPkgs = true;
+          backupFileExtension = "backup";
+          users = listToAttrs (map
+            (uname: {
+              name = uname;
+              value = import ./per-user/${uname};
+            })
+            users);
+        };
+      }
+    ];
   in {
     # Your custom packages
     # Accessible through 'nix build', 'nix shell', etc
@@ -103,14 +120,8 @@
         modules =
           [
             ./per-host/comet
-            (home-manager {
-              home-manager = {
-                useGlobalPkgs = true;
-                backupFileExtension = "backup";
-                users.steve = import ./per-user/steve;
-              };
-            })
           ]
+          ++ (hmHomesForUsers home-manager ["steve"])
           ++ commonModules;
       };
     };
@@ -125,14 +136,8 @@
         modules =
           [
             ./per-host/pangea
-            # (home-manager {
-            #   home-manager = {
-            #     useGlobalPkgs = true;
-            #     backupFileExtension = "backup";
-            #     users.steve = import ./per-user/steve;
-            #   };
-            # })
           ]
+          ++ (hmHomesForUsers home-manager ["steve"])
           ++ commonModules;
       };
 
@@ -142,6 +147,7 @@
           [
             ./per-host/fake
           ]
+          ++ (hmHomesForUsers home-manager ["user"])
           ++ commonModules;
       };
 
@@ -150,14 +156,8 @@
         modules =
           [
             ./per-host/aster
-            (home-manager {
-              home-manager = {
-                useGlobalPkgs = true;
-                backupFileExtension = "backup";
-                users.steve = import ./per-user/steve;
-              };
-            })
           ]
+          ++ (hmHomesForUsers home-manager ["steve"])
           ++ commonModules;
       };
     };

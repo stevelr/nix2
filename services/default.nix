@@ -583,8 +583,10 @@ in {
         // {
           isInteractive = true;
         };
+
+      # generic user, usually low permission, for dev shells and misc containers
       user = {
-        uid = 1001;
+        uid = 5500;
         gid = 100;
         isInteractive = true;
       };

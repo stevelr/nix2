@@ -23,3 +23,6 @@ aster:
 mboot:
     sudo systemctl restart container@media.service
     sudo machinectl shell media
+
+update:
+    nix flake update

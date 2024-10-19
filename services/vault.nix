@@ -1,7 +1,8 @@
-{ config
-, pkgs
-, lib
-, ...
+{
+  config,
+  pkgs,
+  lib,
+  ...
 }:
 # Hashicorp vault
 #   Initialization:
@@ -29,8 +30,7 @@ let
   tlsCertDir = "/etc/ssl/vault";
   tlsCertPath = "${tlsCertDir}/fullchain.pem";
   tlsKeyPath = "${tlsCertDir}/privkey.pem";
-in
-{
+in {
   containers = lib.optionalAttrs cfg.enable {
     vault = {
       autoStart = cfg.enable;
@@ -43,8 +43,8 @@ in
         }
         # add tls certs if vault is tls endpoint
         // (lib.optionalAttrs cfg.settings.tls.enable {
-          "${tlsCertDir}/fullchain.pem" = { hostPath = cfg.settings.tls.chain; };
-          "${tlsCertDir}/privkey.pem" = { hostPath = cfg.settings.tls.privkey; };
+          "${tlsCertDir}/fullchain.pem" = {hostPath = cfg.settings.tls.chain;};
+          "${tlsCertDir}/privkey.pem" = {hostPath = cfg.settings.tls.privkey;};
         });
 
       ephemeral = true;
@@ -67,8 +67,8 @@ in
         environment.variables.TZ = config.my.containerCommon.timezone;
         environment.systemPackages = with pkgs; [
           bind.dnsutils
-          vault-bin
           lsof
+          unstable.vault-bin
           jq
         ];
         environment.etc."vault.d/vault.hcl".text = ''
@@ -100,8 +100,8 @@ in
             node_id = "${cfg.bridge}"
           }
         '';
-        users.users = mkUsers [ "vault" ];
-        users.groups = mkGroups [ "vault" ];
+        users.users = mkUsers ["vault"];
+        users.groups = mkGroups ["vault"];
 
         networking =
           myLib.netDefaults cfg bridgeCfg
@@ -121,9 +121,9 @@ in
         systemd.network.networks.eth0.dhcpV4Config.ClientIdentifier = "mac";
 
         systemd.services.vault = {
-          wantedBy = [ "multi-user.target" ];
-          after = [ "network-online.target" ];
-          requires = [ "network-online.target" ];
+          wantedBy = ["multi-user.target"];
+          after = ["network-online.target"];
+          requires = ["network-online.target"];
           enable = cfg.enable;
 
           unitConfig = {
@@ -133,7 +133,7 @@ in
             StartLimitBurst = 3;
           };
           serviceConfig = {
-            ExecStart = "${pkgs.vault-bin}/bin/vault server -config /etc/vault.d";
+            ExecStart = "${pkgs.unstable.vault-bin}/bin/vault server -config /etc/vault.d";
             ExecReload = "/run/current-system/sw/bin/kill --signal HUP $MAINPID";
             WorkingDirectory = storagePath;
 
@@ -146,7 +146,7 @@ in
             PrivateDevices = "yes";
             SecureBits = "keep-caps";
             AmbientCapabilities = "CAP_IPC_LOCK";
-            CapabilityBoundingSet = [ "CAP_SYSLOG" "CAP_IPC_LOCK" ];
+            CapabilityBoundingSet = ["CAP_SYSLOG" "CAP_IPC_LOCK"];
             NoNewPrivileges = "yes";
 
             KillMode = "process";
@@ -189,39 +189,37 @@ in
         #   '';
         # };
 
-        systemd.services.vault-unseal =
-          let
-            env-path = "${storagePath}/vault.env";
-          in
-          {
-            wantedBy = [ "multi-user.target" ];
-            partOf = [ "vault.service" ];
-            after = [ "vault.service" ];
-            path = with pkgs; [ curl jq ];
-            enable = cfg.enable;
-            serviceConfig = {
-              User = "root";
-              Group = "root";
-            };
-            script = ''
-              set -a
-              source "${env-path}"
-              while true; do
-                initialized=$(curl -s ${localApiAddr}/v1/sys/health | jq -r '.initialized')
-                [[ "$initialized" = "true" ]] && break
-                echo "Vault has not been initialized yet. Will try again after 5 seconds." >&2
-                sleep 5
-              done
-              tee key1.json <<< "{ \"key\": \"$UNSEAL_KEY1\" }" >/dev/null
-              tee key2.json <<< "{ \"key\": \"$UNSEAL_KEY2\" }" >/dev/null
-              tee key3.json <<< "{ \"key\": \"$UNSEAL_KEY3\" }" >/dev/null
-              curl -sS -X PUT --data @key1.json ${localApiAddr}/v1/sys/unseal | jq .
-              curl -sS -X PUT --data @key2.json ${localApiAddr}/v1/sys/unseal | jq .
-              curl -sS -X PUT --data @key3.json ${localApiAddr}/v1/sys/unseal | jq .
-              shred -f -n 99 --remove -z key{1,2,3}.json
-            '';
-            serviceConfig.Type = "oneshot";
+        systemd.services.vault-unseal = let
+          env-path = "${storagePath}/vault.env";
+        in {
+          wantedBy = ["multi-user.target"];
+          partOf = ["vault.service"];
+          after = ["vault.service"];
+          path = with pkgs; [curl jq];
+          enable = cfg.enable;
+          serviceConfig = {
+            User = "root";
+            Group = "root";
           };
+          script = ''
+            set -a
+            source "${env-path}"
+            while true; do
+              initialized=$(curl -s ${localApiAddr}/v1/sys/health | jq -r '.initialized')
+              [[ "$initialized" = "true" ]] && break
+              echo "Vault has not been initialized yet. Will try again after 5 seconds." >&2
+              sleep 5
+            done
+            tee key1.json <<< "{ \"key\": \"$UNSEAL_KEY1\" }" >/dev/null
+            tee key2.json <<< "{ \"key\": \"$UNSEAL_KEY2\" }" >/dev/null
+            tee key3.json <<< "{ \"key\": \"$UNSEAL_KEY3\" }" >/dev/null
+            curl -sS -X PUT --data @key1.json ${localApiAddr}/v1/sys/unseal | jq .
+            curl -sS -X PUT --data @key2.json ${localApiAddr}/v1/sys/unseal | jq .
+            curl -sS -X PUT --data @key3.json ${localApiAddr}/v1/sys/unseal | jq .
+            shred -f -n 99 --remove -z key{1,2,3}.json
+          '';
+          serviceConfig.Type = "oneshot";
+        };
         system.stateVersion = config.my.containerCommon.stateVersion;
       };
     };

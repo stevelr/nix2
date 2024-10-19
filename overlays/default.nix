@@ -3,6 +3,7 @@
   pkgs = inputs.nixpkgs;
   lib = pkgs.lib;
   isStableVersion = pkgs: isNull (lib.match "pre.*" lib.trivial.versionSuffix);
+  #inherit (inputs.)
 in {
   nixpkgs.overlays = [
     # convention: use args self,super for inheritance; final,prev for new/old
@@ -12,6 +13,8 @@ in {
       assert ! (_prev ? myLib); {
         myLib = import ../lib {pkgs = final;};
       })
+
+    # py-natpmp = packages.py-natpmp
 
     # Make the nixos-unstable channel available as pkgs.unstable, for stable
     # versions of pkgs only.

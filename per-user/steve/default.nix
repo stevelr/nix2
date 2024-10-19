@@ -1,4 +1,4 @@
-# per-user/steve/default.nix
+# per-user/steve/default.nix - home manager configuration
 {pkgs, ...}: let
   inherit (pkgs.stdenv) isDarwin;
   inherit (pkgs.lib) optionalAttrs;
@@ -19,6 +19,8 @@ in {
     then "/Users/${username}"
     else "/home/${username}";
   home.stateVersion = "24.05";
+  # allow home-manager to be on unstable while nixos is on stable
+  home.enableNixpkgsReleaseCheck = false;
 
   home.packages = with pkgs; [
     # nats
@@ -30,13 +32,7 @@ in {
     jwt-cli
     step-cli # jwt/x509 utils
 
-    # helix formatters & language servers
-    alejandra
-    gopls
-    marksman
-    nil
     shellcheck
-    taplo
 
     # misc
     age
