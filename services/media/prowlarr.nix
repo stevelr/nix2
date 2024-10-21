@@ -4,11 +4,10 @@
   unstable ? pkgs.unstable,
   lib ? pkgs.lib,
 }: {
-  mkProwlarrService = cfg: let
+  mkService = cfg: let
     dataHome = "${cfg.storage.localBase}/data";
     cacheHome = "${cfg.storage.localBase}/cache";
     configHome = "${cfg.storage.localBase}/config";
-    #logDir = "${cfg.storage.localBase}/log/prowlarr";
   in {
     services = {
       prowlarr = {

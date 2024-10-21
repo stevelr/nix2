@@ -1,6 +1,6 @@
 {
   pkgs,
-  lib,
+  lib ? pkgs.lib,
   ...
 }: let
   inherit (lib) mkForce;

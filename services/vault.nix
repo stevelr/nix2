@@ -24,8 +24,8 @@ let
   localApiAddr = "https://vault.aster.pasilla.net:${toString cfg.settings.apiPort}";
   bridgeCfg = config.my.subnets.${cfg.bridge};
   storagePath = "/var/lib/vault";
-  mkUsers = myLib.mkUsers config.my.userids;
-  mkGroups = myLib.mkGroups config.my.userids;
+  mkUsers = myLib.mkUsers config.const.userids;
+  mkGroups = myLib.mkGroups config.const.userids;
   # local paths for tls cert and private key
   tlsCertDir = "/etc/ssl/vault";
   tlsCertPath = "${tlsCertDir}/fullchain.pem";

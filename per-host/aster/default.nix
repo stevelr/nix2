@@ -4,7 +4,7 @@
   config,
   pkgs,
   lib,
-  outputs,
+  #  outputs,
   ...
 }: let
   nginxIP = "10.55.0.15";
@@ -13,15 +13,16 @@
   activeHttp = mediaIP;
   hostDomain = "pasilla.net";
   fqdn = "aster.pasilla.net";
-  mkUsers = pkgs.myLib.mkUsers config.my.userids;
-  mkGroups = pkgs.myLib.mkGroups config.my.userids;
+
+  mkUsers = pkgs.myLib.mkUsers config.const.userids;
+  mkGroups = pkgs.myLib.mkGroups config.const.userids;
 
   ns101 = {
-    name = "ns101";
+    name = "ns101"; # namespace name
     lanIface = "enp0s1"; # only used for port forwarding
     veNsIp4 = "192.168.10.11";
     veHostIp4 = "192.168.10.10";
-    wgIp4 = "10.2.0.2"; # local (vpn client) interface addr in wg tunnel
+    wgIp4 = "10.2.0.2"; # local (vpn client) interface ip in wg tunnel (dev is wg0)
     wgGateway = "10.2.0.1"; # other end of wg tunnel
     vpnDns = ["10.2.0.1"]; # dns server(s) for vpn clients
   };
@@ -82,8 +83,9 @@ in {
           settings = {
             subdomain = fqdn;
 
-            # list of containers that we proxy
-            # don't include vault if we want vault to terminate tls
+            # list of containers and services that we proxy
+            # Don't include vault if we want vault to terminate tls.
+            # Media services aren't here either: they have their own nginx
             backends = [];
 
             # bindmounts for certificates
@@ -125,8 +127,8 @@ in {
 
         # hashicorp vault for secrets
         vault = let
-          apiPort = config.my.ports.vault.apiPort;
-          clusterPort = config.my.ports.vault.clusterPort;
+          apiPort = config.const.ports.vault.apiPort;
+          clusterPort = config.const.ports.vault.clusterPort;
         in {
           enable = true;
           name = "vault";
@@ -158,19 +160,21 @@ in {
       media = {
         enable = true;
         namespace = "ns101";
+        vpn = ns101;
         container = "media"; # reference media container above
         urlDomain = fqdn;
-        services = {
+        services = with config.const.ports; {
           # defaults: { enable = true; user=<service name>; group=<group name>; };
-          jellyfin.proxyPort = 8096;
-          sonarr.proxyPort = 8989;
-          radarr.proxyPort = 7878;
-          qbittorrent.proxyPort = 11001;
-          audiobookshelf.proxyPort = 7008;
-          jackett.proxyPort = 9117;
-          prowlarr.proxyPort = 9696;
+          jellyfin.proxyPort = jellyfin.port;
+          sonarr.proxyPort = sonarr.port;
+          radarr.proxyPort = radarr.port;
+          qbittorrent.proxyPort = qbittorrent.port;
+          audiobookshelf.proxyPort = audiobookshelf.port;
+          jackett.proxyPort = jackett.port;
+          prowlarr.proxyPort = prowlarr.port;
         };
         staticSite = "/var/lib/media/www";
+        # sshPort needs to be different from 22 to avoid conflicting with host's sshd
         sshPort = 2022;
         # will be opened in firewall (tcp & udp). must be set in qbittorrent settings
         btListenPort = 14641;
@@ -183,7 +187,6 @@ in {
           enable = true;
           execWheelOnly = true;
         };
-        vpn = ns101;
       };
     };
 
@@ -364,7 +367,7 @@ in {
 
     services.tailscale = {
       enable = false;
-      port = config.my.ports.tailscale.port;
+      port = config.const.ports.tailscale.port;
       useRoutingFeatures = "both";
     };
 
@@ -385,19 +388,18 @@ in {
 
       useNetworkd = true;
 
-      firewall = {
+      firewall = with config.const.ports; {
         enable = true;
-        allowedUDPPorts = [53];
+        allowedUDPPorts = [dns.port];
         allowedTCPPorts =
-          [22 53]
-          ++ (lib.optionals config.my.services.tailscale.enable [config.my.ports.tailscale.port])
-          ++ (lib.optionals config.my.containers.vault.enable [config.my.ports.vault.apiPort config.my.ports.vault.clusterPort]);
+          [ssh.port dns.port]
+          ++ (lib.optionals config.my.services.tailscale.enable [tailscale.port])
+          ++ (lib.optionals config.my.containers.vault.enable [vault.apiPort vault.clusterPort]);
       };
 
       nftables = {
         enable = true;
         checkRuleset = true;
-
         tables."container-fwd" = {
           name = "container-fwd";
           enable = true;

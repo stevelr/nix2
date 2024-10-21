@@ -12,7 +12,7 @@
   # https://github.com/qbittorrent/qBittorrent/wiki/Running-qBittorrent-without-X-server-(WebUI-only,-systemd-service-set-up,-Ubuntu-15.04-or-newer)
   # ^ has notes about using fstab and systemd dependency on mount to ensure necessary volumes are mounted
 
-  mkQbittorrentService = cfg: let
+  mkService = cfg: let
     dataHome = "${cfg.storage.localBase}/data";
     cacheHome = "${cfg.storage.localBase}/cache";
     configHome = "${cfg.storage.localBase}/config";

@@ -1,11 +1,10 @@
 # services/media/audiobookshelf.nix
 {
-  #config,
   pkgs,
   unstable ? pkgs.unstable,
   lib ? pkgs.lib,
 }: {
-  mkAudiobookshelfService = cfg: let
+  mkService = cfg: let
     dataHome = "${cfg.storage.localBase}/data";
     cacheHome = "${cfg.storage.localBase}/cache";
     configHome = "${cfg.storage.localBase}/config";

@@ -16,8 +16,8 @@
   usersXml = builtins.readFile "./users.xml";
 
   package = pkgs.clickhouse;
-  mkUsers = pkgs.myLib.mkUsers config.my.userids;
-  mkGroups = pkgs.myLib.mkGroups config.my.userids;
+  mkUsers = pkgs.myLib.mkUsers config.const.userids;
+  mkGroups = pkgs.myLib.mkGroups config.const.userids;
 in {
   config.containers = lib.optionalAttrs cfg.enable {
     clickhouse = {

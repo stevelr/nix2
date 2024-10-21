@@ -18,11 +18,11 @@
 in {
   users.users.seafile = {
     isSystemUser = true;
-    uid = config.my.userids.seafile.uid;
+    uid = config.const.userids.seafile.uid;
     group = "seafile";
   };
   users.groups.seafile = {
-    gid = config.my.userids.seafile.gid;
+    gid = config.const.userids.seafile.gid;
   };
   virtualisation.oci-containers.containers = {
     ##

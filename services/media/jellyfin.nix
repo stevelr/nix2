@@ -6,7 +6,7 @@
 }: {
   # https://jellyfin.org/docs/general/administration/configuration/
 
-  mkJellyfinService = cfg: let
+  mkService = cfg: let
     dataDir = "${cfg.storage.localBase}/data/jellyfin";
     configDir = "${cfg.storage.localBase}/config/jellyfin";
     cacheDir = "${cfg.storage.localBase}/cache/jellyfin";

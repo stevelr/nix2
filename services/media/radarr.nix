@@ -4,7 +4,7 @@
   unstable ? pkgs.unstable,
   lib ? pkgs.lib,
 }: {
-  mkRadarrService = cfg: let
+  mkService = cfg: let
     dataHome = "${cfg.storage.localBase}/data";
     cacheHome = "${cfg.storage.localBase}/cache";
     configHome = "${cfg.storage.localBase}/config";

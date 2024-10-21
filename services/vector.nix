@@ -15,8 +15,8 @@
   configYaml = builtins.readFile "${configSrc}/config.yaml";
 
   package = pkgs.unstable.vector;
-  mkUsers = myLib.mkUsers config.my.userids;
-  mkGroups = myLib.mkGroups config.my.userids;
+  mkUsers = myLib.mkUsers config.const.userids;
+  mkGroups = myLib.mkGroups config.const.userids;
 in
   lib.optionalAttrs cfg.enable {
     containers.vector = {

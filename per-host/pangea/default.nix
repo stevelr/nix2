@@ -2,15 +2,15 @@
 {
   config,
   pkgs,
-  lib,
+  lib ? pkgs.lib,
   outputs,
   ...
 }: let
   inherit (builtins) pathExists;
   inherit (lib) optional attrNames listToAttrs filterAttrs;
 
-  mkUsers = pkgs.myLib.mkUsers config.my.userids;
-  mkGroups = pkgs.myLib.mkGroups config.my.userids;
+  mkUsers = pkgs.myLib.mkUsers config.const.userids;
+  mkGroups = pkgs.myLib.mkGroups config.const.userids;
   # exporterUsers = (listToAttrs (map
   #   (exp: {
   #     name = exp.user;
@@ -163,7 +163,7 @@ in {
           };
         };
         "vault" = let
-          cfgPorts = config.my.ports.vault;
+          cfgPorts = config.const.ports.vault;
         in {
           name = "vault";
           bridge = "container-br0";
@@ -215,8 +215,8 @@ in {
           bridge = "container-br0";
           address = "10.144.0.22";
           settings = {
-            httpPort = config.my.ports.clickhouse.http;
-            tcpPort = config.my.ports.clickhouse.binary;
+            httpPort = config.const.ports.clickhouse.http;
+            tcpPort = config.const.ports.clickhouse.binary;
           };
         };
         "vector" = {
@@ -224,7 +224,7 @@ in {
           bridge = "container-br0";
           address = "10.144.0.23";
           settings = {
-            apiPort = config.my.ports.vector.port;
+            apiPort = config.const.ports.vector.port;
           };
         };
       };
@@ -254,7 +254,7 @@ in {
         tailscale.enable = true;
         kea.control-agent = {
           enable = true;
-          port = config.my.ports.kea.port;
+          port = config.const.ports.kea.port;
         };
         unbound.enable = false;
       };

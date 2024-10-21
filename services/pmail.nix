@@ -10,8 +10,8 @@
   cfg = myLib.configIf config.my.containers name;
   bridgeCfg = config.my.subnets.${cfg.bridge};
   inherit (pkgs) myLib;
-  mkUsers = pkgs.myLib.mkUsers config.my.userids;
-  mkGroups = pkgs.myLib.mkGroups config.my.userids;
+  mkUsers = pkgs.myLib.mkUsers config.const.userids;
+  mkGroups = pkgs.myLib.mkGroups config.const.userids;
 in {
   containers = lib.optionalAttrs cfg.enable {
     pmail = {

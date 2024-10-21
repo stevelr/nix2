@@ -7,7 +7,7 @@
   services.nats = {
     enable = false;
     jetstream = true;
-    port = config.my.ports.nats.port;
+    port = config.const.ports.nats.port;
     serverName = "${config.my.hostName}-nats";
   };
 }

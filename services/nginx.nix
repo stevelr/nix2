@@ -1,4 +1,6 @@
-# nginx.nix
+# services/nginx.nix
+# nginx to support containers and services on this host
+#     config.my.containers.nginx.settings is the list of backends
 {
   config,
   pkgs,
@@ -7,12 +9,12 @@
 }: let
   inherit (builtins) concatStringsSep getAttr;
   inherit (pkgs) myLib;
-  inherit (config.my.containers) nginx; # gitea vault seafile;
+  inherit (config.my.containers) nginx;
 
   cfg = myLib.configIf config.my.containers "nginx";
   bridgeCfg = config.my.subnets.${nginx.bridge};
-  mkUsers = myLib.mkUsers config.my.userids;
-  mkGroups = myLib.mkGroups config.my.userids;
+  mkUsers = myLib.mkUsers config.const.userids;
+  mkGroups = myLib.mkGroups config.const.userids;
   # true if the container is proxied
   isProxied = n: lib.lists.elem n cfg.settings.backends;
 in {

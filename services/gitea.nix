@@ -9,8 +9,8 @@
   name = "gitea";
   bridgeCfg = config.my.subnets.${cfg.bridge};
   cfg = myLib.configIf config.my.containers name;
-  mkUsers = myLib.mkUsers config.my.userids;
-  mkGroups = myLib.mkGroups config.my.userids;
+  mkUsers = myLib.mkUsers config.const.userids;
+  mkGroups = myLib.mkGroups config.const.userids;
 in {
   containers = lib.optionalAttrs cfg.enable {
     gitea = {
