@@ -1,6 +1,6 @@
 # services/media/audiobookshelf.nix
 {
-  config,
+  #config,
   pkgs,
   unstable ? pkgs.unstable,
   lib ? pkgs.lib,
@@ -12,7 +12,7 @@
   in {
     services = {
       audiobookshelf = {
-        enable = cfg.enable && (builtins.elem "audiobookshelf" cfg.backends);
+        enable = cfg.enable && cfg.services.audiobookshelf.enable;
         description = "audiobookshelf service (${unstable.audiobookshelf.pname}-${unstable.audiobookshelf.version})";
         documentation = ["man:audiobookshelf(1)"];
         wants = ["network-online.target"];
@@ -28,7 +28,7 @@
           XDG_DATA_HOME = "${dataHome}";
           XDG_CONFIG_HOME = "${configHome}";
           XDG_CACHE_HOME = "${cacheHome}";
-          TZ = config.my.containerCommon.timezone; # shouold be UTC
+          TZ = cfg.timeZone;
         };
 
         serviceConfig = {
@@ -57,7 +57,7 @@
             ${unstable.audiobookshelf}/bin/audiobookshelf \
                --metadata ${dataHome}/audiobookshelf \
                --config ${configHome}/audiobookshelf \
-               --port ${toString config.my.ports.audiobookshelf.port}
+               --port ${toString cfg.services.audiobookshelf.proxyPort}
           '';
         };
       };

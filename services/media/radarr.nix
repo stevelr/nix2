@@ -1,6 +1,5 @@
 # services/media/radarr.nix
 {
-  config,
   pkgs,
   unstable ? pkgs.unstable,
   lib ? pkgs.lib,
@@ -12,7 +11,7 @@
   in {
     services = {
       radarr = {
-        enable = cfg.enable && (builtins.elem "radarr" cfg.backends);
+        enable = cfg.enable && cfg.services.radarr.enable;
         description = "radarr service (${unstable.radarr.pname}-${unstable.radarr.version})";
         documentation = ["man:radarr(1)"];
         wants = ["network-online.target"];
@@ -28,7 +27,7 @@
           XDG_DATA_HOME = "${dataHome}";
           XDG_CONFIG_HOME = "${configHome}";
           XDG_CACHE_HOME = "${cacheHome}";
-          TZ = config.my.containerCommon.timezone; # shouold be UTC
+          TZ = cfg.timeZone;
         };
 
         serviceConfig = {

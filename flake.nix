@@ -65,7 +65,6 @@
           [
             # import the overlays module
             (import ./overlays {inherit inputs;})
-
             # common modules
             # ...
           ]

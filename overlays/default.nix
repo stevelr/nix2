@@ -14,7 +14,12 @@ in {
         myLib = import ../lib {pkgs = final;};
       })
 
-    # py-natpmp = packages.py-natpmp
+    # import packges
+    (final: _prev: let
+      packages = import ../pkgs {inherit (_prev) config system pkgs;};
+    in {
+      inherit packages;
+    })
 
     # Make the nixos-unstable channel available as pkgs.unstable, for stable
     # versions of pkgs only.

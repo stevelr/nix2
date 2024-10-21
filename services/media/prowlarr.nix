@@ -1,6 +1,5 @@
 # services/media/prowlarr.nix
 {
-  config,
   pkgs,
   unstable ? pkgs.unstable,
   lib ? pkgs.lib,
@@ -13,7 +12,7 @@
   in {
     services = {
       prowlarr = {
-        enable = cfg.enable && (builtins.elem "prowlarr" cfg.backends);
+        enable = cfg.enable && cfg.services.prowlarr.enable;
         description = "prowlarr service (${unstable.prowlarr.pname}-${unstable.prowlarr.version})";
         documentation = ["man:prowlarr(1)"];
         wants = ["network-online.target"];
@@ -29,7 +28,7 @@
           XDG_DATA_HOME = "${dataHome}";
           XDG_CONFIG_HOME = "${configHome}";
           XDG_CACHE_HOME = "${cacheHome}";
-          TZ = config.my.containerCommon.timezone; # shouold be UTC
+          TZ = cfg.timeZone;
         };
 
         serviceConfig = {

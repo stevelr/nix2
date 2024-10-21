@@ -235,6 +235,56 @@
     };
   };
 
+  namespaceOptions = {
+    enable = mkOption {
+      type = types.bool;
+      description = "enable the vpn namespace";
+      default = true;
+      example = false;
+    };
+    name = mkOption {
+      type = types.str;
+      example = "ns";
+      description = "namespace name";
+    };
+    lanIface = mkOption {
+      type = types.str;
+      example = "enp2s0";
+      description = "name of lan interface on host";
+    };
+    veNsIp4 = mkOption {
+      type = types.str;
+      example = "192.168.10.11";
+      description = "ip addr of veth bridge in namespace";
+    };
+    veHostIp4 = mkOption {
+      type = types.str;
+      example = "192.168.10.10";
+      description = "ip addr ofveth bridge on host";
+    };
+    wgIp4 = mkOption {
+      type = types.str;
+      default = "10.2.0.2";
+      description = "client(local) ip addr in tunnel. For proton vpn, the default " 10.2 .0 .2 " should work";
+    };
+    wgGateway = mkOption {
+      type = types.str;
+      default = "10.2.0.1";
+      description = "remote gateway in tunnel. For protonVPN, the default '10.2.0.1'should work";
+    };
+    vpnDns = mkOption {
+      type = types.listOf types.str;
+      example = ["10.2.0.1"];
+      description = "dns servers for vpn clients";
+    };
+    configFile = mkOption {
+      type = types.nullOr types.str;
+      example = "/etc/wg/wg0.conf";
+      description = "path to wireguard config file. Default is /etc/router/NAMESPACE/wg.conf";
+      default = null;
+    };
+  };
+
   makeNet = n: let
     dns = valueOr n.dns n.gateway;
     hasDhcp = (! isNull n.dhcp) && n.dhcp.enable;
@@ -427,50 +477,7 @@ in {
 
       vpnNamespaces = mkOption {
         type = types.attrsOf (types.submodule {
-          options = {
-            enable = mkOption {
-              type = types.bool;
-              description = "enable the vpn namespace";
-              default = true;
-              example = false;
-            };
-            name = mkOption {
-              type = types.str;
-              example = "ns";
-              description = "namespace name";
-            };
-            lanIface = mkOption {
-              type = types.str;
-              example = "enp2s0";
-              description = "name of lan interface on host";
-            };
-            veNsIp4 = mkOption {
-              type = types.str;
-              example = "192.168.10.11";
-              description = "ip addr of veth bridge in namespace";
-            };
-            veHostIp4 = mkOption {
-              type = types.str;
-              example = "192.168.10.10";
-              description = "ip addr ofveth bridge on host";
-            };
-            wgIp4 = mkOption {
-              type = types.str;
-              example = "10.2.0.2";
-              description = "client(local) ip addr in tunnel";
-            };
-            vpnDns = mkOption {
-              type = types.listOf types.str;
-              example = ["10.2.0.1"];
-              description = "dns servers for vpn clients";
-            };
-            configFile = mkOption {
-              type = types.nullOr types.str;
-              example = "/etc/wg/wg0.conf";
-              description = "path to wireguard config file. Default is /etc/router/NAMESPACE/wg.conf";
-              default = null;
-            };
-          };
+          options = namespaceOptions;
         });
         default = {};
         description = "wireguard vpns";
@@ -739,7 +746,6 @@ in {
       };
 
       vector = {port = 8686;};
-      ##qryn = { port = 3100; };
 
       # media-group
       jellyfin = {port = 8096;};

@@ -1,6 +1,5 @@
 # services/media/jellyfin.nix
 {
-  config,
   pkgs,
   unstable ? pkgs.unstable,
   lib ? pkgs.lib,
@@ -15,7 +14,7 @@
   in {
     services = {
       jellyfin = {
-        enable = cfg.enable && (builtins.elem "jellyfin" cfg.backends);
+        enable = cfg.enable && cfg.services.jellyfin.enable;
         description = "jellyfin service (${unstable.jellyfin.pname}-${unstable.jellyfin.version})";
         documentation = ["man:jellyfin(1)"];
         # this service runs inside the container,
@@ -38,7 +37,7 @@
           JELLYFIN_CACHE_DIR = cacheDir;
           JELLYFIN_LOG_DIR = logDir;
           JELLYFIN_WEB_DIR = "${unstable.jellyfin-web}/share/jellyfin-web";
-          TZ = config.my.containerCommon.timezone; # shouold be UTC
+          TZ = cfg.timeZone; # shouold be UTC
         };
 
         serviceConfig = {

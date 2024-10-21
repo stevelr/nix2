@@ -1,6 +1,5 @@
 # services/media/jackett.nix
 {
-  config,
   pkgs,
   unstable ? pkgs.unstable,
   lib ? pkgs.lib,
@@ -12,7 +11,7 @@
   in {
     services = {
       jackett = {
-        enable = cfg.enable && (builtins.elem "jackett" cfg.backends);
+        enable = cfg.enable && cfg.services.jackett.enable;
         description = "jackett service (${unstable.jackett.pname}-${unstable.jackett.version})";
         documentation = ["man:jackett(1)"];
         wants = ["network-online.target"];
@@ -28,7 +27,7 @@
           XDG_DATA_HOME = "${dataHome}";
           XDG_CONFIG_HOME = "${configHome}";
           XDG_CACHE_HOME = "${cacheHome}";
-          TZ = config.my.containerCommon.timezone; # shouold be UTC
+          TZ = cfg.timeZone;
         };
 
         serviceConfig = {
@@ -55,7 +54,7 @@
           in "!${preStartScript}";
           ExecStart = ''
             ${unstable.jackett}/bin/jackett \
-              --Port ${toString config.my.ports.jackett.port}
+              --Port ${toString cfg.services.jackett.proxyPort}
           '';
         };
       };

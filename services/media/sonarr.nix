@@ -11,7 +11,6 @@
 #     exit 1
 # fi
 {
-  config,
   pkgs,
   unstable ? pkgs.unstable,
   lib ? pkgs.lib,
@@ -23,7 +22,7 @@
   in {
     services = {
       sonarr = {
-        enable = cfg.enable && (builtins.elem "sonarr" cfg.backends);
+        enable = cfg.enable && cfg.services.sonarr.enable;
         description = "sonarr service (${pkgs.sonarr.pname}-${unstable.sonarr.version})";
         documentation = ["man:sonarr(1)"];
         wants = ["network-online.target"];
@@ -39,7 +38,7 @@
           XDG_DATA_HOME = "${dataHome}";
           XDG_CONFIG_HOME = "${configHome}";
           XDG_CACHE_HOME = "${cacheHome}";
-          TZ = config.my.containerCommon.timezone; # shouold be UTC
+          TZ = cfg.timeZone;
         };
 
         serviceConfig = {

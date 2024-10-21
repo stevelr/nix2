@@ -15,6 +15,16 @@
   fqdn = "aster.pasilla.net";
   mkUsers = pkgs.myLib.mkUsers config.my.userids;
   mkGroups = pkgs.myLib.mkGroups config.my.userids;
+
+  ns101 = {
+    name = "ns101";
+    lanIface = "enp0s1"; # only used for port forwarding
+    veNsIp4 = "192.168.10.11";
+    veHostIp4 = "192.168.10.10";
+    wgIp4 = "10.2.0.2"; # local (vpn client) interface addr in wg tunnel
+    wgGateway = "10.2.0.1"; # other end of wg tunnel
+    vpnDns = ["10.2.0.1"]; # dns server(s) for vpn clients
+  };
 in {
   imports = [
     ../../services
@@ -58,15 +68,7 @@ in {
       # network namespaces with routing through wireguard vpn
       # each namespace requires a file /etc/router/NAMESPACE/wg.conf
       vpnNamespaces = {
-        ns101 = {
-          name = "ns101";
-          enable = true;
-          lanIface = "enp0s1"; # only used for port forwarding
-          veNsIp4 = "192.168.10.11";
-          veHostIp4 = "192.168.10.10";
-          wgIp4 = "10.2.0.2"; # local (vpn client) interface addr in wg tunnel
-          vpnDns = ["10.2.0.1"]; # dns server(s) for vpn clients
-        };
+        inherit ns101;
       };
 
       containers = {
@@ -158,17 +160,17 @@ in {
         namespace = "ns101";
         container = "media"; # reference media container above
         urlDomain = fqdn;
-        backends = ["jellyfin" "sonarr" "radarr" "qbittorrent" "audiobookshelf" "jackett" "prowlarr"];
-        staticSite = "/var/lib/media/www";
-        mediaUserExtraConfig = {
-          # groups should include 'wheel' if sudo is enabled
-          extraGroups = ["media-group" "wheel" "video" "render"];
-          # TODO: remove python3 later?
-          packages = with pkgs; [curl jq helix python3];
-          openssh.authorizedKeys.keys = [
-            "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFilbUTPgUrnInm3Nz2U0rE5oUCzx4uFgwGJYjZwmhpN user@aster"
-          ];
+        services = {
+          # defaults: { enable = true; user=<service name>; group=<group name>; };
+          jellyfin.proxyPort = 8096;
+          sonarr.proxyPort = 8989;
+          radarr.proxyPort = 7878;
+          qbittorrent.proxyPort = 11001;
+          audiobookshelf.proxyPort = 7008;
+          jackett.proxyPort = 9117;
+          prowlarr.proxyPort = 9696;
         };
+        staticSite = "/var/lib/media/www";
         sshPort = 2022;
         # will be opened in firewall (tcp & udp). must be set in qbittorrent settings
         btListenPort = 14641;
@@ -181,6 +183,7 @@ in {
           enable = true;
           execWheelOnly = true;
         };
+        vpn = ns101;
       };
     };
 
@@ -327,13 +330,14 @@ in {
           just
           jq
           lsof
-          #hello-custom
           ripgrep
           starship
           #tailscale
           vim
           wget
           wireguard-tools
+
+          packages.hello-custom
         ]
         ++ (with pkgs.unstable; [
           novnc

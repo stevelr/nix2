@@ -1,7 +1,5 @@
 # services/media/default.nix
 #
-# TODO
-#    Qbittorrent has a nat-pmp setting in the ui. Does that mean I don't need to run the natpmp client to query the forwarded port?
 # TODO: browser-in-browser (?)
 # TODO (2): test jellyfin gpu configuration
 # TODO (3): health check and recovery services
@@ -14,6 +12,28 @@
 #       prefer them to be in /media/log
 #       some services use XDG_CONFIG_HOME for data and logs. we could use symlinks
 #         (or bind mounts, like we do for nginx) to separate them
+# document all dependencies on config
+#     my.userids
+#     my.media (intended0)
+# my.vpnNamespaces.${cfg.namespace}
+# my.ports
+# my.containerCommon.timeZone
+#
+# This file has minimal dependencies on config:
+#  config.my.vpnNamespaces
+#  config.my.media
+#  also - indirectly (through duplication)
+#    - users and groups have the same userids and group ids as in my.userids
+#    - service ports are the same as in my.ports
+#    These are intentionally duplicated, to reduce dependencies on config
+#    so that this file is more portable
+#
+#
+# setup notes:
+#  - when downloading configuration for proton vpn,
+#    use wireguard/linux, and be sure to turn on NAT-PMP port forwarding
+#    and you must choose a server has the left-right arrow icon which means p2p
+#
 {
   config,
   pkgs,
@@ -21,21 +41,26 @@
   lib,
   ...
 }: let
-  inherit (lib) concatMapStrings concatStringsSep types mkOption;
+  inherit (lib) concatMapStrings concatStringsSep attrValues attrsToList;
+  inherit (lib) types mkOption optionals optionalAttrs mkForce;
+  inherit (builtins) filter;
 
-  mkUsers = pkgs.myLib.mkUsers config.my.userids;
-  mkGroups = pkgs.myLib.mkGroups config.my.userids;
-
+  #nsCfg = config.my.vpnNamespaces.${config.my.media.namespace};
   cfg = config.my.media;
-  nsCfg = config.my.vpnNamespaces.${cfg.namespace};
 
-  audiobookshelf = (import ./audiobookshelf.nix {inherit pkgs config;}).mkAudiobookshelfService cfg;
-  jackett = (import ./jackett.nix {inherit pkgs config;}).mkJackettService cfg;
-  jellyfin = (import ./jellyfin.nix {inherit pkgs config;}).mkJellyfinService cfg;
-  prowlarr = (import ./prowlarr.nix {inherit pkgs config;}).mkProwlarrService cfg;
-  qbittorrent = (import ./qbittorrent.nix {inherit pkgs config;}).mkQbittorrentService cfg;
-  radarr = (import ./radarr.nix {inherit pkgs config;}).mkRadarrService cfg;
-  sonarr = (import ./sonarr.nix {inherit pkgs config;}).mkSonarrService cfg;
+  # backends: list of enabled services {}
+  backends =
+    map (s: s.value // {name = s.name;})
+    (filter (s: s.value.enable) (attrsToList cfg.services));
+
+  audiobookshelf = (import ./audiobookshelf.nix {inherit pkgs;}).mkAudiobookshelfService cfg;
+  jackett = (import ./jackett.nix {inherit pkgs;}).mkJackettService cfg;
+  jellyfin = (import ./jellyfin.nix {inherit pkgs;}).mkJellyfinService cfg;
+  prowlarr = (import ./prowlarr.nix {inherit pkgs;}).mkProwlarrService cfg;
+  qbittorrent = (import ./qbittorrent.nix {inherit pkgs;}).mkQbittorrentService cfg;
+  radarr = (import ./radarr.nix {inherit pkgs;}).mkRadarrService cfg;
+  sonarr = (import ./sonarr.nix {inherit pkgs;}).mkSonarrService cfg;
+  scripts = import ./scripts.nix {inherit cfg pkgs;};
 
   # nginx template for backend service
   # params:
@@ -46,16 +71,16 @@
   # included in all backends for simplicity
   serverConfig = name: port: ''
     server {
-      listen                    ${nsCfg.veNsIp4}:80;
+      listen                    ${cfg.vpn.veNsIp4}:80;
       server_name               ${name};
       return                    301 https://$host$request_uri;
     }
     server {
-      listen                    ${nsCfg.veNsIp4}:443 ssl;
+      listen                    ${cfg.vpn.veNsIp4}:443 ssl;
       http2                     on;
       server_name               ${name};
       location / {
-        proxy_pass              http://127.0.0.1:${toString port};
+        proxy_pass              http://127.0.0.1:${port};
         proxy_set_header        Host $host;
         proxy_set_header        X-Real-IP $remote_addr;
         proxy_set_header        X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -70,12 +95,12 @@
   # nginx template for static site . also default_server
   staticSite = host: www: ''
     server {
-      listen                    ${nsCfg.veNsIp4}:80 default_server;
+      listen                    ${cfg.vpn.veNsIp4}:80 default_server;
       server_name               ${host};
       return                    301 https://$host$request_uri;
     }
     server {
-      listen                    ${nsCfg.veNsIp4}:443 ssl default_server;
+      listen                    ${cfg.vpn.veNsIp4}:443 ssl default_server;
       server_name               ${host};
       location / {
         autoindex off;
@@ -116,17 +141,6 @@ in {
           example = "/var/www/html";
           default = null;
         };
-        backends = mkOption {
-          type = types.listOf types.str;
-          description = "backend services within container";
-          default = ["jellyfin"];
-        };
-        mediaUserExtraConfig = mkOption {
-          type = types.nullOr (types.attrsOf types.anything);
-          description = "additional config for users.users.media";
-          default = null;
-          example = {packages = [pkgs.hello];};
-        };
         sshPort = mkOption {
           type = types.nullOr types.int;
           description = "ssh listener port, or null to disable openssh server";
@@ -166,13 +180,60 @@ in {
           description = "sudo options";
           default = null;
         };
+
+        timeZone = mkOption {
+          type = types.str;
+          description = "timezone for all media containers";
+          default = "Etc/UTC";
+        };
+
+        vpn = mkOption {
+          type = types.attrsOf types.anything;
+          description = "one of vpnNamespaces";
+          # type checking is done by namespaceOptions in services.default;
+          default = {};
+        };
+
+        services = mkOption {
+          type = types.attrsOf (types.submodule {
+            options = {
+              enable = mkOption {
+                type = types.bool;
+                description = "enable the service";
+                default = true;
+              };
+              user = mkOption {
+                type = types.nullOr types.str;
+                description = "user name of service. defaults to service name";
+                default = null;
+              };
+              group = mkOption {
+                type = types.nullOr types.str;
+                description = "group name. Defaults to user name";
+                default = null;
+              };
+              proxyPort = mkOption {
+                type = types.int;
+                description = "proxy http port";
+                example = 8080;
+              };
+              extraConfig = mkOption {
+                type = types.attrsOf types.anything;
+                description = "additional configuration";
+                default = {};
+              };
+            };
+          });
+          description = "media backend services";
+          default = {};
+        };
       };
     };
     default = {};
     description = "media server config and components";
   };
 
-  config.containers = lib.optionalAttrs cfg.enable {
+  config.containers = optionalAttrs cfg.enable {
     "${cfg.container}" = {
       autoStart = false; # started by wrapper config
       ephemeral = true; # wipe and restart root volumes. all persistend data is mounted
@@ -211,29 +272,94 @@ in {
           };
           firewall = {
             enable = true;
-            allowedTCPPorts = [80 443] ++ (lib.optionals (!isNull cfg.sshPort) [cfg.sshPort]);
+            allowedTCPPorts = [80 443] ++ (optionals (!isNull cfg.sshPort) [cfg.sshPort]);
           };
           # add each backend to /etc/hosts (within the container)
           extraHosts =
             concatStringsSep "\n"
-            (map (s: "127.0.0.1 ${s}.${cfg.urlDomain}") cfg.backends);
+            (map (s: "127.0.0.1 ${s.name}.${cfg.urlDomain}") backends);
         };
 
         # Create users and groups. Each backend service runs with its own unique userid.
         # All backend services share the same group "media-group", which makes it easier
         # to manage files in the shared folders
-        users.users =
-          lib.recursiveUpdate
-          (mkUsers (cfg.backends ++ ["nginx" "media"])) {
-            media = cfg.mediaUserExtraConfig;
-            nginx = {extraGroups = ["media-group"];};
+        users.users = {
+          nginx = {
+            uid = mkForce 5508;
+            group = "nginx";
+            extraGroups = ["media-group"];
+            isSystemUser = true;
           };
-        users.groups = mkGroups (cfg.backends
-          ++ [
-            "media-group"
-            "media"
-            "nginx"
-          ]);
+          media = {
+            uid = 5550;
+            group = "media";
+            # include "wheel" if sudo is enabled
+            extraGroups = ["media-group" "wheel" "render" "video"];
+            packages = [
+              scripts.fixPortForward
+              scripts.getExternalIP
+              scripts.vpnCheck
+            ];
+            openssh.authorizedKeys.keys = [
+              "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFilbUTPgUrnInm3Nz2U0rE5oUCzx4uFgwGJYjZwmhpN user@aster"
+            ];
+            isNormalUser = true;
+          };
+          jellyfin = {
+            uid = 5551;
+            group = "jellyfin";
+            extraGroups = ["media-group" "render" "video"];
+            isSystemUser = true;
+          };
+          sonarr = {
+            uid = 5552;
+            group = "sonarr";
+            extraGroups = ["media-group"];
+            isSystemUser = true;
+          };
+          radarr = {
+            uid = 5553;
+            group = "radarr";
+            extraGroups = ["media-group"];
+            isSystemUser = true;
+          };
+          qbittorrent = {
+            uid = 5554;
+            group = "qbittorrent";
+            extraGroups = ["media-group"];
+            isSystemUser = true;
+          };
+          audiobookshelf = {
+            uid = 5555;
+            group = "audiobookshelf";
+            extraGroups = ["media-group"];
+            isSystemUser = true;
+          };
+          jackett = {
+            uid = 5556;
+            group = "jackett";
+            extraGroups = ["media-group"];
+            isSystemUser = true;
+          };
+          prowlarr = {
+            uid = 5557;
+            group = "prowlarr";
+            extraGroups = ["media-group"];
+            isSystemUser = true;
+          };
+        };
+        users.groups = {
+          nginx = {gid = mkForce 5508;};
+          media = {gid = 5550;};
+          jellyfin = {gid = 5551;};
+          sonarr = {gid = 5552;};
+          radarr = {gid = 5553;};
+          qbittorrent = {gid = 5554;};
+          audiobookshelf = {gid = 5555;};
+          jackett = {gid = 5556;};
+          prowlarr = {gid = 5557;};
+          media-group = {gid = 5803;};
+        };
 
         systemd.services =
           {}
@@ -244,10 +370,6 @@ in {
           // qbittorrent.services
           // radarr.services
           // sonarr.services;
-
-        # blockPorts =
-        #   concatStringsSep ","
-        #   (map (bk: toString config.my.ports.${bk}.port) cfg.backends);
 
         services.nginx = {
           enable = true;
@@ -261,7 +383,7 @@ in {
           clientMaxBodySize = "10g"; # allow larger post sizes
 
           appendConfig = ''
-            worker_processes 4;
+            worker_processes 3;
           '';
 
           commonHttpConfig = ''
@@ -288,21 +410,21 @@ in {
             # ignore staticSite param and use generated file
             (staticSite "${cfg.urlDomain}" "/etc/www")
             # backends
-            + (concatStringsSep "\n" (map (s: serverConfig "${s}.${cfg.urlDomain}" config.my.ports.${s}.port)
-                cfg.backends));
+            + (concatStringsSep "\n" (map (s: serverConfig "${s.name}.${cfg.urlDomain}" (toString s.proxyPort))
+                backends));
         };
 
-        services.openssh = lib.optionalAttrs (!isNull cfg.sshPort) {
+        services.openssh = optionalAttrs (!isNull cfg.sshPort) {
           enable = true;
           settings.PermitRootLogin = "no";
           settings.PasswordAuthentication = false;
           listenAddresses = [
             {
-              addr = "${nsCfg.veNsIp4}";
+              addr = "${cfg.vpn.veNsIp4}";
               port = cfg.sshPort;
             }
           ];
-          startWhenNeeded = lib.mkForce false;
+          startWhenNeeded = mkForce false;
         };
         services.resolved.enable = false;
 
@@ -311,15 +433,24 @@ in {
         programs.zsh.enable = true;
 
         environment.systemPackages = with pkgs; [
+          curl
           bash
           bind.dnsutils
+          gnused
+          iproute2
           jq
           lsof
           nmap
           helix
-          libnatpmp # TODO: move to qbittorrent
-          python3 # TODO: for testing natpmp
+          packages.py-natpmp
         ];
+
+        # environment.etc."media-env".text = ''
+        #   # variables used by media-related scripts
+        #   QBITTORRENT_ADDR=http://127.0.0.0:${toString config.my.ports.qbittorrent.port}
+        #   VPN_GATEWAY=${toString cfg.vpn.wgGateway}
+        #   NATPMP=${pkgs.py-natpmp}/bin/natpmp-client.py
+        # '';
 
         environment.etc."resolv.conf".text = let
           # set dns resolver to the vpn's dns
@@ -328,9 +459,9 @@ in {
             concatMapStrings (ip: ''
               nameserver ${ip}
             '')
-            config.my.vpnNamespaces.${cfg.namespace}.vpnDns;
+            cfg.vpn.vpnDns;
         in
-          lib.mkForce ''
+          mkForce ''
             option edns0
             ${nameservers}
           '';
@@ -385,9 +516,14 @@ in {
           </html>
         '';
 
-        environment.variables.TZ = config.my.containerCommon.timezone;
+        environment.variables.TZ = cfg.timeZone;
 
-        system.stateVersion = "24.11"; # config.my.containerCommon.stateVersion;
+        environment.etc."script_log".text =
+          concatStringsSep "\n"
+          (map (s: "${s.name}=${s.outPath}/bin/${s.meta.mainProgram}")
+            (attrValues scripts));
+
+        system.stateVersion = "24.11";
       };
     };
   };

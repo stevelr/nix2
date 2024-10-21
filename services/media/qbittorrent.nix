@@ -1,6 +1,5 @@
 # services/media/qbittorrent.nix
 {
-  config,
   pkgs,
   unstable ? pkgs.unstable,
   lib ? pkgs.lib,
@@ -19,12 +18,11 @@
     configHome = "${cfg.storage.localBase}/config";
     configPath = "${configHome}/qBittorrent/qBittorrent.conf";
     downloadDir = pkgs.myLib.valueOr cfg.storage.downloads "${cfg.storage.localBase}/downloads";
-    webUiPort = config.my.ports.qbittorrent.port;
-    vpnCfg = config.my.vpnNamespaces.${cfg.namespace};
+    webUiPort = cfg.services.qbittorrent.proxyPort;
   in {
     services = {
       qbittorrent = {
-        enable = cfg.enable && (builtins.elem "qbittorrent" cfg.backends);
+        enable = cfg.enable && cfg.services.qbittorrent.enable;
         description = "qBittorrent (${unstable.qbittorrent-nox.pname}-${unstable.qbittorrent-nox.version})";
         documentation = ["man:qbittorrent-nox(1)"];
         wants = ["network-online.target"];
@@ -36,7 +34,7 @@
           XDG_DATA_HOME = "${dataHome}";
           XDG_CONFIG_HOME = "${configHome}";
           XDG_CACHE_HOME = "${cacheHome}";
-          TZ = config.my.containerCommon.timezone; # shouold be UTC
+          TZ = cfg.timeZone;
         };
 
         path = [
@@ -63,7 +61,7 @@
             '';
             defaultInit = pkgs.writeText "initial_qbittorrent.conf" ''
               [BitTorrent]
-              Session\InterfaceAddress=${vpnCfg.wgIp4}
+              Session\InterfaceAddress=${cfg.vpn.wgIp4}
               Session\InterfaceName=wg0
               Session\TempPath=${downloadDir}/incomplete
               Session\DefaultSavePath=${downloadDir}
