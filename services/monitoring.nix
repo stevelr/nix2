@@ -1,35 +1,43 @@
-{config, ...}: let
-  collectorIp = config.my.subnets."container-br0".gateway;
-  #keaCtrlCfg = config.my.service.kea.control-agent;
+{
+  config,
+  pkgs,
+  lib ? pkgs.lib,
+  ...
+}: let
+  inherit (pkgs) myLib;
+  cfg = myLib.configIf config.my.services "monitoring";
+  defaultNet = "container-br0";
 
-  mkExporter = name: {
+  mkExporter = name: net: {
     enable = true;
     user = "${name}-exporter";
     group = "exporters";
     port = config.const.ports."node-exporter".port;
-    listenAddress = collectorIp;
+    listenAddress = config.my.subnets.${net}.gateway;
   };
 in {
-  services.prometheus = {
-    enable = true;
-    exporters = {
-      node =
-        (mkExporter "node")
-        // {
-          enabledCollectors = [
-            "logind"
-            "systemd"
-          ];
-        };
-      # kea = (mkExporter "kea") // {
-      #   enable = keaCtrlCfg.enable;
-      #   targets = [ "http://127.0.0.1:${toString keaCtrlCfg.port}" ];
-      # };
-      #nginx = mkExporter "nginx";
-      #smartctl = mkExporter "smartctl";
-      #systemd = mkExporter "systemd";
-      #unbound = mkExporter "unbound";
-      #zfs = mkExporter "zfs";
+  services = lib.optionalAttrs cfg.enable {
+    prometheus = {
+      enable = true;
+      exporters = {
+        node =
+          (mkExporter "node" defaultNet)
+          // {
+            enabledCollectors = [
+              "logind"
+              "systemd"
+            ];
+          };
+        # kea = (mkExporter "kea" defaultNet) // {
+        #   enable = keaCtrlCfg.enable;
+        #   targets = [ "http://127.0.0.1:${toString keaCtrlCfg.port}" ];
+        # };
+        #nginx = mkExporter "nginx" defaultNet;
+        #smartctl = mkExporter "smartctl" defaultNet;
+        #systemd = mkExporter "systemd" defaultNet;
+        #unbound = mkExporter "unbound" defaultNet;
+        #zfs = mkExporter "zfs" defaultNet;
+      };
     };
   };
 }

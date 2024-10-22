@@ -140,11 +140,12 @@
           ++ commonModules;
       };
 
-      fake = mkSystem {
+      # template for minimal system
+      minimal = mkSystem {
         system = "x86_64-linux";
         modules =
           [
-            ./per-host/fake
+            ./per-host/minimal
           ]
           ++ (hmHomesForUsers home-manager ["user"])
           ++ commonModules;

@@ -3,7 +3,6 @@
   pkgs = inputs.nixpkgs;
   lib = pkgs.lib;
   isStableVersion = pkgs: isNull (lib.match "pre.*" lib.trivial.versionSuffix);
-  #inherit (inputs.)
 in {
   nixpkgs.overlays = [
     # convention: use args self,super for inheritance; final,prev for new/old

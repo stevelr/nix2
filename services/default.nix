@@ -513,6 +513,20 @@ in {
               };
               default = {};
             };
+
+            prometheus = mkOption {
+              type = types.submodule {
+                options = {
+                  enable = mkEnableOption "Prometheus";
+                  net = mkOption {
+                    type = types.nullOr types.str;
+                    description = "name of network that prometheus uses";
+                    exmaple = "br0";
+                    default = null;
+                  };
+                };
+              };
+            };
           };
         };
         default = {};

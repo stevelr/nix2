@@ -10,9 +10,6 @@ in {
     ./wezterm.nix
   ];
 
-  # needed because home-manager is 24.11 and nixos is 24.05. I don't know why it's at 24.11 though
-  #gome.enableNixpkgsReleaseCheck = false;
-
   home.username = username;
   home.homeDirectory =
     if isDarwin

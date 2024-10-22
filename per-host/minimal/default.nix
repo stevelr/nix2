@@ -1,22 +1,32 @@
 # per-host/fake/default.nix
 # minimum configuration
 #
-{ config, pkgs, lib, ... }:
 {
+  config,
+  pkgs,
+  lib ? pkgs.lib,
+  ...
+}: {
   imports = [
     ../../services
-    ../../modules/zfs
+    #../../modules/zfs
     ./hardware-configuration.nix
   ];
 
   config = {
     my = {
-      hostName = "fake";
+      hostName = "minimal";
       hostDomain = "pasilla.net";
       localDomain = "pnet";
+      pre.subnets = {};
     };
 
-    nix.settings.experimental-features = [ "nix-command" "flakes" ];
+    # TODO: update this to match mounted files systems
+    fileSystems = {
+      "/".device = "/dev/hda1";
+    };
+
+    nix.settings.experimental-features = ["nix-command" "flakes"];
 
     # Bootloader.
     boot.loader.systemd-boot.enable = true;
@@ -37,6 +47,17 @@
         "2.us.pool.ntp.org"
         "3.us.pool.ntp.org"
       ];
+    };
+
+    users.users = {
+      user = {
+        isNormalUser = true;
+        group = "users";
+        shell = "${pkgs.zsh}/bin/zsh";
+      };
+    };
+    users.groups.exporters = {
+      gid = lib.mkForce config.const.userids.exporters.gid;
     };
 
     programs.zsh.enable = true;
@@ -73,7 +94,7 @@
       useNetworkd = true;
       firewall = {
         enable = true;
-        allowedTCPPorts = [ 22 80 ];
+        allowedTCPPorts = with config.const.ports; [ssh.port http.port];
       };
       nftables = {
         enable = true;

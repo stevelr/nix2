@@ -20,6 +20,9 @@ pangea:
 aster:
     sudo nixos-rebuild --refresh --cores 4 switch --flake .#aster --show-trace
 
+minimal:
+    sudo nixos-rebuild build --flake .#minimal --show-trace
+
 mboot:
     sudo systemctl restart container@media.service
     sudo machinectl shell media

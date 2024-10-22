@@ -26,8 +26,8 @@
 # TODO: don't have network connectivity from host, for example, if container runs sshd, can't ssh to it. Needs debugging. OTOH, lack of network connectivity is good because we know there are no leaks
 {
   config,
-  lib,
   pkgs,
+  lib ? pkgs.lib,
   ...
 }:
 # Any host that runs vpn must set
