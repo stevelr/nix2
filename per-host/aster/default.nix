@@ -370,6 +370,7 @@ in {
 
     networking = {
       hostName = "aster"; # Define your hostname.
+      hostId = "5e798d29"; # first 8 chars of /etc/machine-id
       wireless.enable = false;
       extraHosts = ''
         ${nginxIP} ${fqdn}

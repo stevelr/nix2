@@ -5,21 +5,31 @@
   config,
   pkgs,
   lib ? pkgs.lib,
+  inputs,
   ...
 }: let
-  inherit (lib) types mkOption imap1 match listToAttrs;
+  inherit (lib) types mkOption imap1 listToAttrs mkMerge match mkForce;
 
-  hostId = "110011";
+  hostId = "8a6d1a7a";
   hostName = "mintest";
 
-  root-pool = {
-    name = "zroot-${hostId}";
-    baseDataset = "/${hostName}";
-  };
   boot-pool = {
     name = "zboot-${hostId}";
-    baseDataset = "/${hostName}";
+    baseDataset = "";
   };
+  root-pool = {
+    name = "zroot-${hostId}";
+    baseDataset = "";
+  };
+
+  # ZFS pool names have a short alpha-numeric unique ID suffix, like: main-1z9h4t
+  poolNameRegex = "([[:alpha:]]+)-([[:alnum:]]{6})";
+  # ZFS dataset names as used by my options must begin with "/" and not end
+  # with "/" (and meet the usual ZFS naming requirements), or be the empty
+  # string.
+  #datasetNameRegex = "(/[[:alnum:]][[:alnum:].:_-]*)+|";
+  # [ss] updated regex allows second and subsequent path components to begin with . (example: /home/user/.local)
+  datasetNameRegex = "(/[[:alnum:]][[:alnum:].:_-]*)(/[[:alnum:].][[:alnum:].:_-]*)*|";
 
   mountSpecAttr = {
     mountPoint,
@@ -37,12 +47,13 @@
     subDataset ? "",
     options ? [],
   }:
-    mountSpecAttr {
-      inherit mountPoint;
-      device = "${pool.name}${pool.baseDataset}${subDataset}";
-      fsType = "zfs";
-      options = ["zfsutil"] ++ options;
-    };
+    assert match datasetNameRegex subDataset != null;
+      mountSpecAttr {
+        inherit mountPoint;
+        device = mkForce "${pool.name}${pool.baseDataset}${subDataset}";
+        fsType = "zfs";
+        options = ["zfsutil"] ++ options;
+      };
   zfsMountSpecs = pool: mountSpecs (zfsMountSpecAttr pool);
 
   zfsPerHostMountSpecAttr = pool: {
@@ -50,16 +61,28 @@
     subDataset ? "",
     options ? [],
   }:
-  # assert match datasetNameRegex subDataset != null;
-    zfsMountSpecAttr pool {
-      inherit mountPoint options;
-      subDataset = "/${config.my.hostName}${subDataset}";
-    };
+    assert match datasetNameRegex subDataset != null;
+      zfsMountSpecAttr pool {
+        inherit mountPoint options;
+        subDataset = "/${config.my.hostName}${subDataset}";
+      };
   zfsPerHostMountSpecs = pool: mountSpecs (zfsPerHostMountSpecAttr pool);
+
+  efiMountSpecAttr = drive: let
+    drivePart = "${drive}-part${toString config.my.fs.partitions.EFI.id}";
+  in
+    mountSpecAttr {
+      mountPoint = "/boot/efis/${drivePart}";
+      device = "/dev/disk/by-id/${drivePart}";
+      fsType = "vfat";
+      options = ["x-systemd.idle-timeout=1min" "x-systemd.automount" "noauto"];
+    };
+  efiMountSpecs = drives: mountSpecs efiMountSpecAttr drives;
 in {
   imports = [
     ../../services
-    ./disco.nix
+    inputs.disko.nixosModules.disko
+    ./disko-config.nix
     #../../modules/zfs
     ./hardware-configuration.nix
   ];
@@ -70,7 +93,7 @@ in {
     example = ["nvme0n1" "nvme1n1"];
   };
   options.my.fs.partitions = mkOption {
-    type = types.attrsOf types.submodule {
+    type = types.attrsOf (types.submodule {
       options = {
         id = mkOption {
           type = types.int;
@@ -83,7 +106,7 @@ in {
           example = "2g";
         };
       };
-    };
+    });
   };
   options.my.fs.ashift = mkOption {
     type = types.int;
@@ -91,7 +114,28 @@ in {
     default = 9;
   };
 
-  config = {
+  config = let
+    mirrorDrives = config.my.fs.mirrorDrives;
+    grubMB = map (x: x.devices) config.boot.loader.grub.mirroredBoots;
+    lenGMB = builtins.length grubMB;
+    declaredMB = map (d: ["/dev/disk/by-id/${d}"]) mirrorDrives;
+    lenDMB = builtins.length declaredMB;
+  in {
+    assertions = [
+      {
+        assertion =
+          (map (x: x.devices) config.boot.loader.grub.mirroredBoots)
+          == (map (d: ["/dev/disk/by-id/${d}"]) mirrorDrives);
+        message =
+          "boot.loader.grub.mirroredBoots (count=${toString lenGMB}) ${toString grubMB} does not correspond"
+          + " to only my.zfs.mirrorDrives (count=${toString lenDMB}) ${toString declaredMB}";
+      }
+      {
+        assertion = config.boot.loader.grub.mirroredBoots != [] -> config.boot.loader.grub.devices == [];
+        message = "Should not define both boot.loader.grub.devices and boot.loader.grub.mirroredBoots";
+      }
+    ];
+
     my = {
       hostName = hostName;
       hostDomain = "pasilla.net";
@@ -100,7 +144,7 @@ in {
       pre.subnets = {};
       #fs.mirrorDrives = ["nvme0n1" "nvme1n1"];
       # drive name that comes after /dev/disk/by-id/
-      fs.mirrorDrives = ["FIXME"];
+      fs.mirrorDrives = ["sdx98" "sdx99"];
       fs.partitions = {
         legacyBIOS = {
           id = 1;
@@ -114,13 +158,13 @@ in {
           id = 3;
           size = "1G";
         };
-        main = {
+        root = {
           id = 4;
-          size = "10G";
+          size = "10G"; # smaller than usual, but ok for testing
         };
         swap = {
           id = 5;
-          size = "1G";
+          size = "1G"; # unreasonably small, but ok for testing
         };
         spare = {
           id = 6;
@@ -129,12 +173,12 @@ in {
       };
       fs.ashift = 9;
     };
-    # TODO: update this to match mounted files systems
-    fileSystems =
+
+    fileSystems = mkMerge [
       (zfsPerHostMountSpecs boot-pool [
         {mountPoint = "/boot";}
       ])
-      // (zfsPerHostMountSpecs root-pool [
+      (zfsPerHostMountSpecs root-pool [
         {mountPoint = "/";}
         {mountPoint = "/nix";}
         {mountPoint = "/tmp";}
@@ -144,54 +188,57 @@ in {
         {mountPoint = "/var/lib/db";}
         {mountPoint = "/var/lib/media";}
       ])
-      // (
+      (
         zfsMountSpecs root-pool [
           {
             subDataset = "/scratch";
             mountPoint = "/mnt/scratch";
           }
         ]
-      );
+      )
+      (efiMountSpecs mirrorDrives)
+    ];
 
     nix.settings.experimental-features = ["nix-command" "flakes"];
 
     boot.supportedFilesystems = ["zfs"];
 
-    # enable systemd-boot EFI boot manager
-    boot.loader.systemd-boot.enable = true;
-    boot.loader.systemd-boot.consoleMode = "auto"; # pick suitable mode
-    # # For problematic UEFI firmware
-    # boot.loader.grub.efiInstallAsRemovable = true;
-    # boot.loader.efi.canTouchEfiVariables = false;
-    boot.loader.efi.canTouchEfiVariables = true;
-    boot.loader.grub = {
-      enable = true;
-      mirroredBoots =
-        imap1
-        (idx: drive: {
-          devices = ["/dev/disk/by-id/${drive}"];
-          efiBootloaderId = "NixOS-${config.my.hostname}-boot${toString idx}";
-          efiSysMountPoint = "/boot/efis/${drive}-part${toString config.my.fs.partitions.EFI}";
-          path = "/boot";
-        })
-        config.my.fs.mirrorDrives;
+    boot.loader = {
+      systemd-boot.enable = true;
+      systemd-boot.consoleMode = "auto"; # pick suitable mode
+      # # For problematic UEFI firmware
+      # boot.loader.grub.efiInstallAsRemovable = true;
+      # boot.loader.efi.canTouchEfiVariables = false;
+      efi.canTouchEfiVariables = true;
+      efi.efiSysMountPoint = let
+        firstDrive = builtins.head mirrorDrives;
+      in "/boot/efis/${firstDrive}-part${toString config.my.fs.partitions.EFI.id}";
+      generationsDir.copyKernels = true;
 
-      copyKernels = true;
-      efiSupport = true;
-      zfsSupport = true;
-      extraPrepareConfig = ''
-        for D in ${toString config.my.fs.mirrorDrives}; do
-          DP=$D-part${toString config.my.fs.partitions.EFI}
-          E=/boot/efis/$DP
-          mkdir -p $E
-          mount /dev/disk/by-id/$DP $E
-        done
-      '';
+      grub = {
+        enable = true;
+        mirroredBoots =
+          imap1
+          (idx: drive: {
+            devices = ["/dev/disk/by-id/${drive}"];
+            efiBootloaderId = "NixOS-${config.my.hostName}-boot${toString idx}";
+            efiSysMountPoint = "/boot/efis/${drive}-part${toString config.my.fs.partitions.EFI.id}";
+            path = "/boot";
+          })
+          mirrorDrives;
+        copyKernels = true;
+        efiSupport = true;
+        zfsSupport = true;
+        extraPrepareConfig = ''
+          for D in ${toString mirrorDrives}; do
+            DP=$D-part${toString config.my.fs.partitions.EFI.id}
+            E=/boot/efis/$DP
+            mkdir -p $E
+            mount /dev/disk/by-id/$DP $E
+          done
+        '';
+      };
     };
-    boot.efi.efiSysMountPoint = let
-      firstDrive = builtins.head config.my.fs.mirrorDrives;
-    in "/boot/efis/${firstDrive}-part${toString config.my.fs.partitions.EFI.id}";
-    boot.generationsDir.copyKernels = true;
 
     # enable ip forwarding - required for routing and for vpns
     boot.kernel.sysctl."net.ipv4.ip_forward" = 1;
@@ -249,6 +296,7 @@ in {
 
     networking = {
       hostName = config.my.hostName;
+      hostId = hostId;
       wireless.enable = false;
       useNetworkd = true;
       firewall = {
@@ -259,7 +307,7 @@ in {
         enable = true;
         checkRuleset = true;
       };
-      networking.timeServers = config.const.ntpServers.global;
+      timeServers = config.const.ntpServers.global;
     };
     system.stateVersion = "24.05";
   };

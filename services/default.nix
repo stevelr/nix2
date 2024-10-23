@@ -354,6 +354,12 @@ in {
         description = "system domain";
       };
 
+      hostId = mkOption {
+        type = types.str;
+        description = "unique host id, 8 hex chars. Use this for networking.hostId and in zfs pool names. The primary use case is to ensure when using ZFS that a pool isn't imported accidentally on a wrong machine.";
+        example = "718f3c7f";
+      };
+
       localDomain = mkOption {
         type = types.str;
         example = "foo.com";

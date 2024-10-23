@@ -36,7 +36,6 @@
       PAGER = "${pkgs.less}/bin/less";
     };
 
-    programs.bash.enable = true;
     programs.zsh.enable = true;
   };
 }
