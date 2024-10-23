@@ -25,6 +25,7 @@ in {
     #aria2
     gocryptfs
     jwt-cli
+    markdown-oxide # PKM
     natscli
     nix-output-monitor
     nmap

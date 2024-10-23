@@ -5,14 +5,19 @@
 
     defaultEditor = true;
     extraPackages = with pkgs; [
-      #bash-language-server
       alejandra # nix formatter
+      bash-language-server
       docker-compose-language-service
+      hclfmt
+      lua-language-server
       marksman
+      markdown-oxide
       nil # nix LSP
       #nixpkgs-fmt
       taplo
       taplo-lsp
+      terraform-ls
+      rust-analyzer
       vscode-langservers-extracted
       yaml-language-server
     ];
@@ -54,6 +59,7 @@
 
     languages = {
       language-server = {
+        bash-language-server.command = "${pkgs.bash-language-server}/bin/bash-language-server";
         nil = {
           command = "${pkgs.nil}/bin/nil";
           config = {
@@ -63,11 +69,27 @@
             };
           };
         };
+        taplo.command = "${pkgs.taplo}/bin/taplo";
+        terraform-ls.command = "${pkgs.terraform-ls}/bin/terraform-ls";
+        vscode-css-language-server.command = "${pkgs.vscode-langservers-extracted}/bin/vscode-css-language-server";
+        vscode-html-language-server.command = "${pkgs.vscode-langservers-extracted}/bin/vscode-html-language-server";
+        vscode-json-language-server.command = "${pkgs.vscode-langservers-extracted}/bin/vscode-json-language-server";
+        docker-compose-language-service.command = "${pkgs.docker-compose-language-service}/bin/docker-compose-langserver";
+        lua-language-server.command = "${pkgs.lua-language-server}/bin/lua-language-server";
+        marksman.command = "${pkgs.marksman}/bin/marksman";
+        rust-analyzer.command = "${pkgs.rust-analyzer}/bin/rust-analyzer";
+        markdown-oxide.command = "${pkgs.markdown-oxide}/bin/markdown-oxide";
+        yaml-language-server.command = "${pkgs.yaml-language-server}/bin/yaml-language-server";
       };
       language = [
         {
+          name = "bash";
+          auto-format = true;
+          language-servers = ["bash-language-server"];
+        }
+        {
           name = "markdown";
-          language-servers = ["marksman"];
+          language-servers = ["markdown-oxide"];
           formatter = {
             command = "prettier";
             args = ["--stdin-filepath" "file.md"];
@@ -75,10 +97,40 @@
           auto-format = true;
         }
         {
+          name = "lua";
+          auto-format = true;
+          language-servers = ["lua-language-server"];
+        }
+        {
           name = "nix";
           auto-format = true;
           formatter.command = "${pkgs.alejandra}/bin/alejandra";
           language-servers = ["nil"];
+        }
+        {
+          name = "hcl";
+          formatter.command = "${pkgs.hclfmt}/bin/hclfmt";
+          language-servers = ["terraform-ls"];
+        }
+        {
+          name = "json";
+          language-servers = ["vscode-json-language-server"];
+        }
+        {
+          name = "rust";
+          language-servers = ["rust-analyzer"];
+        }
+        {
+          name = "html";
+          language-servers = ["vscode-html-language-server"];
+        }
+        {
+          name = "css";
+          language-servers = ["vscode-css-language-server"];
+        }
+        {
+          name = "docker-compose";
+          language-servers = ["docker-compose-language-service"];
         }
         {
           name = "toml";
