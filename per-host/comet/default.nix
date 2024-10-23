@@ -1,6 +1,5 @@
 # per-host/comet/default.nix
 {
-  config,
   pkgs,
   lib,
   ...
@@ -12,6 +11,7 @@ in {
     (with pkgs; [
       inetutils # ping, traceroute, ...
       tailscale
+      markdown-oxide
       _1password # 1password cli
       yubikey-manager
       yubikey-personalization
@@ -56,15 +56,7 @@ in {
 
   services.nix-daemon.enable = true;
 
-  services.chrony = {
-    enable = true;
-    serverOption = "offline"; # "offline" if machine is frequently offline
-    servers = config.const.ntpServers.us;
-  };
-
-  # do I need to define this?
-  #nixpkgs.hostPlatform = "aarch64-darwin";
-
+  nixpkgs.hostPlatform = "aarch64-darwin";
   nixpkgs.config.allowUnfreePredicate = pkg:
     builtins.elem (lib.getName pkg) [
       "1password-cli"
@@ -79,17 +71,19 @@ in {
   networking = {
     #computerName = hostname;
     hostName = hostname;
-    timeServers = config.const.ntpServers.us;
   };
 
   system.defaults.trackpad.Clicking = true; # tap to click
-  system.keyboard.remapCapsLockToControl = true; # make caps lock key act as Ctrl
+  system.keyboard = {
+    enableKeyMapping = true;
+    remapCapsLockToControl = true; # make caps lock key act as Ctrl
+  };
   # use touch id instead of sudo password
   security.pam.enableSudoTouchIdAuth = true;
 
   # important: before changing, review nix-darwin changelog
   system.stateVersion = 5;
-  system.nixpkgsRelease = "24.05";
+  #system.nixpkgsRelease = "24.11";
 
   nix = {
     # Necessary for using flakes on this system.

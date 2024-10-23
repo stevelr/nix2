@@ -57,7 +57,7 @@
       restic # backups
       socat
       sqlite
-      tldr # documentation
+      tlrc # tldr client
       wget
       xsv # csv processor
       xz # compression
