@@ -14,7 +14,6 @@
   configSrc = "/home/steve/project/ops/containers/vector";
   configYaml = builtins.readFile "${configSrc}/config.yaml";
 
-  package = pkgs.unstable.vector;
   mkUsers = myLib.mkUsers config.const.userids;
   mkGroups = myLib.mkGroups config.const.userids;
 in
@@ -79,7 +78,7 @@ in
             ln -s "${file}" "$out"
           '';
       in {
-        environment.systemPackages = [package];
+        environment.systemPackages = [pkgs.vector];
         networking =
           myLib.netDefaults cfg bridgeCfg
           // {
@@ -101,7 +100,7 @@ in
             StateDirectory = "vector";
             LogsDirectory = "vector";
             TimeoutStartSec = "infinity";
-            ExecStart = "${lib.getExe package} --config ${validateConfig conf}";
+            ExecStart = "${lib.getExe pkgs.vector} --config ${validateConfig conf}";
             ExecReload = "${pkgs.coreutils}/bin/kill -HUP $MAINPID";
           };
           unitConfig = {
@@ -118,7 +117,7 @@ in
         };
         services.resolved.enable = false;
         environment.variables.TZ = config.my.containerCommon.timezone;
-        system.stateVersion = 24.05; # broken in 24.11 # config.my.containerCommon.stateVersion;
+        system.stateVersion = 24.05; # note: vector is broken in 24.11
       }; # config
     }; # container
   }

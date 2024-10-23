@@ -1,7 +1,6 @@
 # services/media/audiobookshelf.nix
 {
   pkgs,
-  unstable ? pkgs.unstable,
   lib ? pkgs.lib,
 }: {
   mkService = cfg: let
@@ -12,7 +11,7 @@
     services = {
       audiobookshelf = {
         enable = cfg.enable && cfg.services.audiobookshelf.enable;
-        description = "audiobookshelf service (${unstable.audiobookshelf.pname}-${unstable.audiobookshelf.version})";
+        description = "audiobookshelf service (${pkgs.audiobookshelf.pname}-${pkgs.audiobookshelf.version})";
         documentation = ["man:audiobookshelf(1)"];
         wants = ["network-online.target"];
         after = ["network.target"];
@@ -20,7 +19,7 @@
 
         path = [
           pkgs.bash
-          unstable.audiobookshelf
+          pkgs.audiobookshelf
         ];
 
         environment = {
@@ -53,7 +52,7 @@
             '';
           in "!${preStartScript}";
           ExecStart = ''
-            ${unstable.audiobookshelf}/bin/audiobookshelf \
+            ${pkgs.audiobookshelf}/bin/audiobookshelf \
                --metadata ${dataHome}/audiobookshelf \
                --config ${configHome}/audiobookshelf \
                --port ${toString cfg.services.audiobookshelf.proxyPort}

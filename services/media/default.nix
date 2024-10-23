@@ -21,11 +21,10 @@
 #    use wireguard/linux, and be sure to turn on NAT-PMP port forwarding
 #    and you must choose a server has the left-right arrow icon which means p2p
 #
-{
+args @ {
   config,
   pkgs,
-  #unstable ? pkgs.unstable,
-  lib,
+  lib ? pkgs.lib,
   ...
 }: let
   inherit (lib) concatMapStrings concatStringsSep attrValues attrsToList mergeAttrsList;
@@ -400,15 +399,15 @@ in {
         programs.zsh.enable = true;
 
         environment.systemPackages = with pkgs; [
-          curl
           bash
           bind.dnsutils
+          curl
           gnused
+          helix
           iproute2
           jq
           lsof
           nmap
-          helix
           packages.py-natpmp
         ];
 
@@ -482,7 +481,7 @@ in {
           concatStringsSep "\n"
           (map (s: "${s.name}=${s.outPath}/bin/${s.meta.mainProgram}") (attrValues scripts));
 
-        system.stateVersion = "24.11";
+        system.stateVersion = "24.05";
       };
     };
   };

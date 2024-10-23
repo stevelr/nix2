@@ -37,7 +37,7 @@ let
   inherit (pkgs.myLib) valueOr;
 
   # program bin shorthand
-  ip = "${pkgs.iproute}/bin/ip";
+  ip = "${pkgs.iproute2}/bin/ip";
   nft = "${pkgs.nftables}/bin/nft";
   wg = "${pkgs.wireguard-tools}/bin/wg";
   nixosContainer = "${pkgs.nixos-container}/bin/nixos-container";
@@ -53,7 +53,7 @@ let
     requires = ["nftables.service"];
     after = ["network-online.target" "nss-lookup.target" "nftables.service"];
     wantedBy = ["multi-user.target"];
-    path = with pkgs; [iproute nftables wireguard-tools];
+    path = with pkgs; [iproute2 nftables wireguard-tools];
     enable = true;
     serviceConfig = {
       Type = "oneshot";
@@ -142,6 +142,7 @@ let
           _NFT
         '';
       in "${start}";
+
       ExecStopPost = let
         stop = pkgs.writeShellScript "wgnet-${ns}-down" ''
           # remove wg network and namespace

@@ -26,7 +26,6 @@ in {
         environment.systemPackages = with pkgs; [
           bash
           curl # for testing
-          hydroxide
           helix
           netcat # for testing
           nmap

@@ -8,6 +8,7 @@ in {
     ./git.nix
     ./helix.nix
     ./wezterm.nix
+    ../../modules/cli.nix # tools for great cli experience
   ];
 
   home.username = username;
@@ -20,30 +21,16 @@ in {
   home.enableNixpkgsReleaseCheck = false;
 
   home.packages = with pkgs; [
-    # nats
-    nats-server
-    natscli
-    nsc
-    nkeys
-    pwgen
-    jwt-cli
-    step-cli # jwt/x509 utils
-
-    shellcheck
-
-    # misc
     age
-    bind.dnsutils
-    aria2
-    gnused
+    #aria2
     gocryptfs
+    jwt-cli
+    natscli
     nix-output-monitor
     nmap
-    rclone
-    restic
-    rsync
+    pwgen
     socat
-    starship
+    step-cli # jwt/x509 utils
     vault-bin
   ];
 

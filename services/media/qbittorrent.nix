@@ -1,7 +1,6 @@
 # services/media/qbittorrent.nix
 {
   pkgs,
-  unstable ? pkgs.unstable,
   lib ? pkgs.lib,
 }: {
   # qbittorrent wrapper
@@ -23,7 +22,7 @@
     services = {
       qbittorrent = {
         enable = cfg.enable && cfg.services.qbittorrent.enable;
-        description = "qBittorrent (${unstable.qbittorrent-nox.pname}-${unstable.qbittorrent-nox.version})";
+        description = "qBittorrent (${pkgs.qbittorrent-nox.pname}-${pkgs.qbittorrent-nox.version})";
         documentation = ["man:qbittorrent-nox(1)"];
         wants = ["network-online.target"];
         after = ["network.target"]; # ? nss-lookup.target
@@ -39,7 +38,7 @@
 
         path = [
           pkgs.bash
-          unstable.qbittorrent-nox
+          pkgs.qbittorrent-nox
         ];
 
         serviceConfig = {
@@ -91,7 +90,7 @@
               fi
             '';
           in "!${preStartScript}";
-          ExecStart = "${unstable.qbittorrent-nox}/bin/qbittorrent-nox";
+          ExecStart = "${pkgs.qbittorrent-nox}/bin/qbittorrent-nox";
         };
       };
     };

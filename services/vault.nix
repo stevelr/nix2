@@ -67,9 +67,11 @@ in {
         environment.variables.TZ = config.my.containerCommon.timezone;
         environment.systemPackages = with pkgs; [
           bind.dnsutils
+          iproute2 # needed for script if container uses dhcp-assigned addr
           lsof
-          unstable.vault-bin
           jq
+          uutils-coreutils-noprefix # shred
+          vault-bin
         ];
         environment.etc."vault.d/vault.hcl".text = ''
           # address advertised to external clients for api use
@@ -133,7 +135,7 @@ in {
             StartLimitBurst = 3;
           };
           serviceConfig = {
-            ExecStart = "${pkgs.unstable.vault-bin}/bin/vault server -config /etc/vault.d";
+            ExecStart = "${pkgs.vault-bin}/bin/vault server -config /etc/vault.d";
             ExecReload = "/run/current-system/sw/bin/kill --signal HUP $MAINPID";
             WorkingDirectory = storagePath;
 
@@ -179,12 +181,16 @@ in {
 
         #   path = with pkgs; [ curl jq iproute2 ];
 
-        #   script = ''
+        #   script =
+        #let
+        #  ip = "${pkgs.iproute2}/bin/ip";
+        #  jq = "${pkgs.jq}/bin/jq";
+        #in ''
         #     set -exuo pipefail
-        #     ip="$(ip -j addr | jq -r '.[] | select(.operstate == "UP") | .addr_info[] | select(.family == "inet") | .local')"
+        #     ip="$(${ip} -j addr | ${jq} -r '.[] | select(.operstate == "UP") | .addr_info[] | select(.family == "inet") | .local')"
         #     addr="https://$ip"
         #     echo '{"cluster_addr": "'"$addr:${cfg.settings.clusterPort}"'", "api_addr": "'"$addr:${cfg.proxyPort}"'"}' \
-        #     | jq -S . \
+        #     | ${jq} -S . \
         #     > /etc/vault.d/address.json
         #   '';
         # };
@@ -195,28 +201,32 @@ in {
           wantedBy = ["multi-user.target"];
           partOf = ["vault.service"];
           after = ["vault.service"];
-          path = with pkgs; [curl jq];
           enable = cfg.enable;
           serviceConfig = {
             User = "root";
             Group = "root";
           };
-          script = ''
+          script = let
+            curl = "${pkgs.curl}/bin/curl";
+            jq = "${pkgs.jq}/bin/jq";
+            shred = "${pkgs.uutils-coreutils-noprefix}/bin/shred";
+            tee = "${pkgs.uutils-coreutils-noprefix}/bin/tee";
+          in ''
             set -a
             source "${env-path}"
             while true; do
-              initialized=$(curl -s ${localApiAddr}/v1/sys/health | jq -r '.initialized')
+              initialized=$(${curl} -s ${localApiAddr}/v1/sys/health | ${jq} -r '.initialized')
               [[ "$initialized" = "true" ]] && break
               echo "Vault has not been initialized yet. Will try again after 5 seconds." >&2
               sleep 5
             done
-            tee key1.json <<< "{ \"key\": \"$UNSEAL_KEY1\" }" >/dev/null
-            tee key2.json <<< "{ \"key\": \"$UNSEAL_KEY2\" }" >/dev/null
-            tee key3.json <<< "{ \"key\": \"$UNSEAL_KEY3\" }" >/dev/null
-            curl -sS -X PUT --data @key1.json ${localApiAddr}/v1/sys/unseal | jq .
-            curl -sS -X PUT --data @key2.json ${localApiAddr}/v1/sys/unseal | jq .
-            curl -sS -X PUT --data @key3.json ${localApiAddr}/v1/sys/unseal | jq .
-            shred -f -n 99 --remove -z key{1,2,3}.json
+            ${tee} key1.json <<< "{ \"key\": \"$UNSEAL_KEY1\" }" >/dev/null
+            ${tee} key2.json <<< "{ \"key\": \"$UNSEAL_KEY2\" }" >/dev/null
+            ${tee} key3.json <<< "{ \"key\": \"$UNSEAL_KEY3\" }" >/dev/null
+            ${curl} -sS -X PUT --data @key1.json ${localApiAddr}/v1/sys/unseal | ${jq}  .
+            ${curl} -sS -X PUT --data @key2.json ${localApiAddr}/v1/sys/unseal | ${jq}  .
+            ${curl} -sS -X PUT --data @key3.json ${localApiAddr}/v1/sys/unseal | ${jq}  .
+            ${shred} -f -n 99 --remove -z key{1,2,3}.json
           '';
           serviceConfig.Type = "oneshot";
         };

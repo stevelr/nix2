@@ -38,19 +38,9 @@
     # Set your time zone.
     time.timeZone = "America/Los_Angeles";
 
-    # Time servers
-    services.ntp = {
-      enable = true;
-      servers = [
-        "0.us.pool.ntp.org"
-        "1.us.pool.ntp.org"
-        "2.us.pool.ntp.org"
-        "3.us.pool.ntp.org"
-      ];
-    };
-
     users.users = {
       user = {
+        uid = config.const.userids.user.uid;
         isNormalUser = true;
         group = "users";
         shell = "${pkgs.zsh}/bin/zsh";
@@ -59,8 +49,6 @@
     users.groups.exporters = {
       gid = lib.mkForce config.const.userids.exporters.gid;
     };
-
-    programs.zsh.enable = true;
 
     # Allow specific unfree packages
     # nixpkgs.config.allowUnfreePredicate = pkg:
@@ -71,20 +59,26 @@
     # List packages installed in system profile. To search, run:
     # $ nix search wget
     environment.systemPackages = with pkgs; [
+      bind.dnsutils # dig
       curl
       git
       helix
       just
-      jq
       lsof
       ripgrep
       vim
       wget
     ];
 
+    programs.zsh.enable = true;
     # Enable the OpenSSH daemon.
     services.openssh.enable = true;
-
+    # Eneable ntp client
+    services.chrony = {
+      enable = true;
+      serverOption = "offline"; # "offline" if machine is frequently offline
+      servers = config.const.ntpServers.us;
+    };
     # use systemd-networkd, rather than the legacy systemd.network
     systemd.network.enable = true;
 
@@ -100,6 +94,7 @@
         enable = true;
         checkRuleset = true;
       };
+      networking.timeServers = config.const.ntpServers.global;
     };
     system.stateVersion = "24.05";
   };

@@ -36,10 +36,7 @@ in {
         environment.systemPackages = with pkgs; [
           bind.dnsutils # dig
           curl
-          helix
           iproute2
-          lsof # for debugging
-          vim
         ];
 
         networking =

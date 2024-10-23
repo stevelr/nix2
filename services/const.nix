@@ -54,6 +54,21 @@ in {
       type = types.attrsOf types.anything;
       default = {};
     };
+
+    # ntp.org time server pools
+    ntpServers = mkOption {
+      type = types.attrsOf (types.listOf types.str);
+      description = "ntp servers";
+      default = {
+        # General servers, worldwide
+        global = [
+          "0.pool.ntp.org"
+          "1.pool.ntp.org"
+          "2.pool.ntp.org"
+          "3.pool.ntp.org"
+        ];
+      };
+    };
   };
 
   config.const = {
@@ -93,7 +108,7 @@ in {
       ##
       # user ids 500-999 are available according to this ...
       # https://github.com/NixOS/nixpkgs/blob/f705ee21f6a18c10cff4679142d3d0dc95415daa/nixos/modules/programs/shadow.nix#L13-L14
-      # .. however some unix services (sshd,ntpd,etc.) start at 998 counting down ..
+      # .. however some unix services (sshd,etc.) start at 998 counting down ..
       ##
       unbound = {
         uid = 5501;
@@ -276,6 +291,23 @@ in {
       jackett = {port = 9117;};
       qbittorrent = {port = 11001;};
       audiobookshelf = {port = 7008;};
+    };
+
+    ntpServers = {
+      # United states
+      us = [
+        "0.us.pool.ntp.org"
+        "1.us.pool.ntp.org"
+        "2.us.pool.ntp.org"
+        "3.us.pool.ntp.org"
+      ];
+      # General servers, worldwide
+      global = [
+        "0.pool.ntp.org"
+        "1.pool.ntp.org"
+        "2.pool.ntp.org"
+        "3.pool.ntp.org"
+      ];
     };
   };
 }

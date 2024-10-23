@@ -1,7 +1,6 @@
 # services/media/jackett.nix
 {
   pkgs,
-  unstable ? pkgs.unstable,
   lib ? pkgs.lib,
 }: {
   mkService = cfg: let
@@ -12,7 +11,7 @@
     services = {
       jackett = {
         enable = cfg.enable && cfg.services.jackett.enable;
-        description = "jackett service (${unstable.jackett.pname}-${unstable.jackett.version})";
+        description = "jackett service (${pkgs.jackett.pname}-${pkgs.jackett.version})";
         documentation = ["man:jackett(1)"];
         wants = ["network-online.target"];
         after = ["network.target"];
@@ -20,7 +19,7 @@
 
         path = [
           pkgs.bash
-          unstable.jackett
+          pkgs.jackett
         ];
 
         environment = {
@@ -53,7 +52,7 @@
             '';
           in "!${preStartScript}";
           ExecStart = ''
-            ${unstable.jackett}/bin/jackett \
+            ${pkgs.jackett}/bin/jackett \
               --Port ${toString cfg.services.jackett.proxyPort}
           '';
         };

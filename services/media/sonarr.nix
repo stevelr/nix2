@@ -12,7 +12,6 @@
 # fi
 {
   pkgs,
-  unstable ? pkgs.unstable,
   lib ? pkgs.lib,
 }: {
   mkService = cfg: let
@@ -23,7 +22,7 @@
     services = {
       sonarr = {
         enable = cfg.enable && cfg.services.sonarr.enable;
-        description = "sonarr service (${pkgs.sonarr.pname}-${unstable.sonarr.version})";
+        description = "sonarr service (${pkgs.sonarr.pname}-${pkgs.sonarr.version})";
         documentation = ["man:sonarr(1)"];
         wants = ["network-online.target"];
         after = ["network.target"];
@@ -31,7 +30,7 @@
 
         path = [
           pkgs.bash
-          unstable.sonarr
+          pkgs.sonarr
         ];
 
         environment = {
@@ -63,7 +62,7 @@
               ${ensureDir "${configHome}/Sonarr" "700"}
             '';
           in "!${preStartScript}";
-          ExecStart = "${unstable.sonarr}/bin/Sonarr";
+          ExecStart = "${pkgs.sonarr}/bin/Sonarr";
         };
       };
     };

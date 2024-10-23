@@ -5,7 +5,9 @@
     environment.systemPackages = with pkgs; [
       bind.dnsutils
       curl
+      fd
       file
+      fzf
       git
       gnupg
       gnused
@@ -22,8 +24,8 @@
       ripgrep
       rsync
       unzip
-      wget
       vim
+      wget
       xz
     ];
 

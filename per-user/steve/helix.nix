@@ -1,6 +1,7 @@
 {pkgs, ...}: {
   programs.helix = {
     enable = true;
+    package = pkgs.helix;
 
     defaultEditor = true;
     extraPackages = with pkgs; [
@@ -54,7 +55,7 @@
     languages = {
       language-server = {
         nil = {
-          command = "nil";
+          command = "${pkgs.nil}/bin/nil";
           config = {
             nix.flake = {
               autoArchive = true;
@@ -76,14 +77,14 @@
         {
           name = "nix";
           auto-format = true;
-          formatter.command = "alejandra";
+          formatter.command = "${pkgs.alejandra}/bin/alejandra";
           language-servers = ["nil"];
         }
         {
           name = "toml";
           language-servers = ["taplo"];
           formatter = {
-            command = "taplo";
+            command = "${pkgs.taplo}/bin/taplo";
             args = ["fmt" "-o" "column_width=120" "-"];
           };
           auto-format = true;

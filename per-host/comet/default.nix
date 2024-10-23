@@ -1,5 +1,6 @@
 # per-host/comet/default.nix
 {
+  config,
   pkgs,
   lib,
   ...
@@ -7,52 +8,20 @@
   inherit (pkgs.stdenv) isDarwin;
   hostname = "comet";
 in {
-  services.nix-daemon.enable = true;
-  # Necessary for using flakes on this system.
-  nix.settings.experimental-features = "nix-command flakes";
-  # ???
-  nix.package = pkgs.nixVersions.git;
-
-  nixpkgs.hostPlatform = "aarch64-darwin";
-  nixpkgs.config.allowUnfreePredicate = pkg:
-    builtins.elem (lib.getName pkg) [
-      "1password-cli"
-      "vault-bin"
-    ];
-
-  # Used for backwards compatibility. please read the changelog
-  # before changing: `darwin-rebuild changelog`.
-  system.stateVersion = 4;
-
-  users.users.steve = {
-    name = "steve";
-    home = "/Users/steve";
-  };
-
-  networking.hostName = hostname;
-
   environment.systemPackages =
     (with pkgs; [
-      curl
-      helix
-      jq
-      just
-      less
-      _1password # 1password cli
-      ripgrep
+      inetutils # ping, traceroute, ...
       tailscale
-
-      # yubikey-related
+      _1password # 1password cli
       yubikey-manager
       yubikey-personalization
-      #yubikey-personalization-gui # broken (last checked: 10-10-2024)
       age-plugin-yubikey
+      #yubikey-personalization-gui # broken (last checked: 10-10-2024)
     ])
     ++ (lib.optionals isDarwin (with pkgs; [
       ## darwin-specifix config
       darwin.iproute2mac
       unixtools.nettools # arp, hostname, ifconfig, netstat, route
-      inetutils # ping, traceroute, ...
       #unixtools.getopt
     ]));
 
@@ -60,8 +29,18 @@ in {
     "/share/zsh" # completion for system packages e.g., systemd
   ];
 
+  programs.zsh = {
+    enable = true;
+    enableFzfGit = true; # fzf keybindings for C-g git browsing
+    enableFzfHistory = true; # fzf keybindings for C-r history search
+  };
+
   homebrew = lib.optionalAttrs isDarwin {
     enable = true;
+    # setting onActivation.upgrade=true upgrades outdated formulae on nix-darwin activation
+    onActivation.upgrade = true;
+    # when using nix to manage homebrew, set this to "cleanup" or "zap"
+    onActivation.cleanup = "zap";
     taps = [
     ];
     brews = [
@@ -75,6 +54,75 @@ in {
     ];
   };
 
+  services.nix-daemon.enable = true;
+
+  services.chrony = {
+    enable = true;
+    serverOption = "offline"; # "offline" if machine is frequently offline
+    servers = config.const.ntpServers.us;
+  };
+
+  # do I need to define this?
+  #nixpkgs.hostPlatform = "aarch64-darwin";
+
+  nixpkgs.config.allowUnfreePredicate = pkg:
+    builtins.elem (lib.getName pkg) [
+      "1password-cli"
+      "vault-bin"
+    ];
+
+  users.users.steve = {
+    name = "steve";
+    home = "/Users/steve";
+  };
+
+  networking = {
+    #computerName = hostname;
+    hostName = hostname;
+    timeServers = config.const.ntpServers.us;
+  };
+
+  system.defaults.trackpad.Clicking = true; # tap to click
+  system.keyboard.remapCapsLockToControl = true; # make caps lock key act as Ctrl
   # use touch id instead of sudo password
   security.pam.enableSudoTouchIdAuth = true;
+
+  # important: before changing, review nix-darwin changelog
+  system.stateVersion = 5;
+  system.nixpkgsRelease = "24.05";
+
+  nix = {
+    # Necessary for using flakes on this system.
+    settings.experimental-features = "nix-command flakes";
+
+    # nix package instance: pkgs.nixVersions.{stable, latest, git}
+    package = pkgs.nixVersions.latest;
+
+    ## garbage-collection & other cleanup
+    ##
+    ## Manually:
+    ##   sudo nix-collect-garbage -d     # remove old packages
+    ##   sudo nix-store --optimise       # remove duplicates
+
+    # remove duplicates
+    settings.auto-optimise-store = true;
+    # gc weekly, on Sunday
+    gc.interval = [
+      {
+        Hour = 12;
+        Minute = 0;
+        Weekday = 0;
+      }
+    ];
+    gc.automatic = true;
+    # optimize weekly, on Sunday
+    optimise.automatic = true;
+    optimise.interval = [
+      {
+        Hour = 13;
+        Minute = 0;
+        Weekday = 0;
+      }
+    ];
+  };
 }

@@ -46,13 +46,8 @@ in {
         environment.variables.TZ = config.my.containerCommon.timezone;
 
         environment.systemPackages = with pkgs; [
-          helix
-          jq
-          nmap
-          vim
+          #
         ];
-
-        #services.openssh.enable = true;
 
         services.postgresql = {
           enable = true;

@@ -1,7 +1,6 @@
 # services/media/prowlarr.nix
 {
   pkgs,
-  unstable ? pkgs.unstable,
   lib ? pkgs.lib,
 }: {
   mkService = cfg: let
@@ -12,7 +11,7 @@
     services = {
       prowlarr = {
         enable = cfg.enable && cfg.services.prowlarr.enable;
-        description = "prowlarr service (${unstable.prowlarr.pname}-${unstable.prowlarr.version})";
+        description = "prowlarr service (${pkgs.prowlarr.pname}-${pkgs.prowlarr.version})";
         documentation = ["man:prowlarr(1)"];
         wants = ["network-online.target"];
         after = ["network.target"];
@@ -20,7 +19,7 @@
 
         path = [
           pkgs.bash
-          unstable.prowlarr
+          pkgs.prowlarr
         ];
 
         environment = {
@@ -52,7 +51,7 @@
               ${ensureDir "${configHome}/Prowlarr" "700"}
             '';
           in "!${preStartScript}";
-          ExecStart = "${unstable.prowlarr}/bin/Prowlarr";
+          ExecStart = "${pkgs.prowlarr}/bin/Prowlarr";
         };
       };
     };

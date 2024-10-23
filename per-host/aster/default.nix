@@ -62,7 +62,7 @@ in {
           enable = true;
           wanNet = "aster-lan0";
         };
-        tailscale.enable = false;
+        tailscale.enable = true;
         kea.enable = false;
       };
 
@@ -235,16 +235,6 @@ in {
       LC_TIME = "en_US.UTF-8";
     };
 
-    services.ntp = {
-      enable = true;
-      servers = [
-        "0.us.pool.ntp.org"
-        "1.us.pool.ntp.org"
-        "2.us.pool.ntp.org"
-        "3.us.pool.ntp.org"
-      ];
-    };
-
     # Enable the X11 windowing system.
     services.xserver.enable = true;
 
@@ -324,32 +314,18 @@ in {
 
     # List packages installed in system profile. To search, run:
     # $ nix search wget
-    environment.systemPackages =
-      with pkgs;
-        [
-          curl
-          git
-          helix
-          just
-          jq
-          lsof
-          ripgrep
-          starship
-          #tailscale
-          vim
-          wget
-          wireguard-tools
-
-          packages.hello-custom
-        ]
-        ++ (with pkgs.unstable; [
-          novnc
-          vault-bin
-        ])
-      # ++ (with outputs.packages.${system}; [
-      #   hello-custom
-      # ]);
-      ;
+    environment.systemPackages = with pkgs; [
+      lsof
+      novnc
+      ripgrep
+      starship
+      vault-bin
+      vim
+      wget
+      wireguard-tools
+      #
+      packages.hello-custom
+    ];
     environment.homeBinInPath = true;
 
     # Some programs need SUID wrappers, can be configured further or are
@@ -366,9 +342,14 @@ in {
     services.openssh.enable = true;
 
     services.tailscale = {
-      enable = false;
+      enable = config.my.services.tailscale.enable;
       port = config.const.ports.tailscale.port;
       useRoutingFeatures = "both";
+    };
+    services.chrony = {
+      enable = true;
+      serverOption = "offline"; # "offline" if machine is frequently offline
+      servers = config.const.ntpServers.us;
     };
 
     networking = {
@@ -423,6 +404,7 @@ in {
           '';
         };
       };
+      timeServers = config.const.ntpServers.us;
     };
     system.stateVersion = "24.05";
   };

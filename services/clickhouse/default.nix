@@ -15,7 +15,6 @@
   configXml = builtins.readFile "./config.xml";
   usersXml = builtins.readFile "./users.xml";
 
-  package = pkgs.clickhouse;
   mkUsers = pkgs.myLib.mkUsers config.const.userids;
   mkGroups = pkgs.myLib.mkGroups config.const.userids;
 in {
@@ -44,7 +43,7 @@ in {
       ];
 
       config = {
-        environment.systemPackages = [package];
+        environment.systemPackages = [pkgs.clickhouse];
         networking =
           netDefaults cfg bridgeCfg
           // {
@@ -68,7 +67,7 @@ in {
             StateDirectory = "clickhouse";
             LogsDirectory = "clickhouse";
             TimeoutStartSec = "infinity";
-            ExecStart = "${package}/bin/clickhouse-server --config-file=/etc/clickhouse-server/config.xml";
+            ExecStart = "${pkgs.clickhouse}/bin/clickhouse-server --config-file=/etc/clickhouse-server/config.xml";
             #TimeoutStopSec = 70;
           };
           environment = {

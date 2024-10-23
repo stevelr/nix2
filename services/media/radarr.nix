@@ -1,7 +1,6 @@
 # services/media/radarr.nix
 {
   pkgs,
-  unstable ? pkgs.unstable,
   lib ? pkgs.lib,
 }: {
   mkService = cfg: let
@@ -12,7 +11,7 @@
     services = {
       radarr = {
         enable = cfg.enable && cfg.services.radarr.enable;
-        description = "radarr service (${unstable.radarr.pname}-${unstable.radarr.version})";
+        description = "radarr service (${pkgs.radarr.pname}-${pkgs.radarr.version})";
         documentation = ["man:radarr(1)"];
         wants = ["network-online.target"];
         after = ["network.target"];
@@ -20,7 +19,7 @@
 
         path = [
           pkgs.bash
-          unstable.radarr
+          pkgs.radarr
         ];
 
         environment = {
@@ -52,7 +51,7 @@
               ${ensureDir "${configHome}/Radarr" "700"}
             '';
           in "!${preStartScript}";
-          ExecStart = "${unstable.radarr}/bin/Radarr";
+          ExecStart = "${pkgs.radarr}/bin/Radarr";
         };
       };
     };

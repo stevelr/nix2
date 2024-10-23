@@ -313,14 +313,12 @@ in {
       "vector"
     ];
 
-    services.ntp = {
+    # ntp client
+    services.chrony = {
       enable = true;
-      servers = [
-        "0.us.pool.ntp.org"
-        "1.us.pool.ntp.org"
-        "2.us.pool.ntp.org"
-        "3.us.pool.ntp.org"
-      ];
+      # "iburst" if consistently online, or "offline" if machine is frequently offline
+      serverOption = "iburst";
+      servers = config.const.ntpServers.us;
     };
 
     boot = {
@@ -480,15 +478,11 @@ in {
         # git  # Installed via above programs.git.enable
         alsa-lib
         bind.dnsutils
-        clickhouse
-        cobalt # static site gen
-        zola # static site gen
         fd
         file
         gnupg
         helix
         htop
-        hydra-check
         iotop
         jq
         just
@@ -497,21 +491,20 @@ in {
         man-pages-posix
         natscli
         ncurses
-        openssl
         nixos-generators
+        openssl
         pciutils # lspci
         podman
         podman-compose
-        usbutils
         psmisc
         pwgen
         qemu_full
         quickemu
         ripgrep
         rsync
-        sops # simple flexible tool for secrets
         tmux
         unzip
+        usbutils
         vim
         wget
         xorg.xauth # needed for X11Forwarding

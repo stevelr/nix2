@@ -1,14 +1,13 @@
 # handy tools
 #  for network and system diagnostics
 #
-# To combine with system packages, 
+# To combine with system packages,
 # append to another list like so:
 #     ++ (import ./handy-tools.nix { inherit pkgs; }).full
 #
 # I haven't measured the size of the installation
 #
-{ pkgs }:
-rec {
+{pkgs}: rec {
   minimal = with pkgs; [
     bind.dnsutils # dig
     curl
@@ -37,32 +36,32 @@ rec {
     trippy # network diagnostic (curses)
   ];
 
-  full = 
+  full =
     minimal
     ++ nettools
     ++ (with pkgs; [
-    age # encryption
-    aria2 # torrent download
-    fd # fast find files
-    gnupg
-    gnused # text editing scripted
-    hck # hck (hack, like cut but with regex)
-    helix
-    htop
-    lf # terminal file manager
-    lsof # list open files/ports
-    netcat
-    pciutils # lspci
-    pwgen # generate passwords
-    rclone # sync files to various cloud backends
-    restic  # backups
-    socat
-    sqlite
-    tldr # documentation
-    wget
-    xsv # csv processor
-    xz # compression
-  ]);
+      age # encryption
+      aria2 # torrent download
+      fd # fast find files
+      gnupg
+      gnused # text editing scripted
+      hck # hck (hack, like cut but with regex)
+      helix
+      htop
+      lf # terminal file manager
+      lsof # list open files/ports
+      netcat
+      pciutils # lspci
+      pwgen # generate passwords
+      rclone # sync files to various cloud backends
+      restic # backups
+      socat
+      sqlite
+      tldr # documentation
+      wget
+      xsv # csv processor
+      xz # compression
+    ]);
 
   tools = full;
 }

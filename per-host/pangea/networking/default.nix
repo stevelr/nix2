@@ -1,7 +1,10 @@
 # Sub-modules that organize the more-involved details of my networking configuration.
-
-{ config, pkgs, lib, ... }:
-let
+{
+  config,
+  pkgs,
+  lib,
+  ...
+}: let
   machineId = "2f4d5023"; # first 8 chars of machine id
   iface1 = config.my.hostNets.hostlan1;
   iface2 = config.my.hostNets.hostlan2;
@@ -13,7 +16,7 @@ let
   makeBridgeNet = net: {
     enable = true;
     matchConfig.Name = net.name;
-    address = [ "${net.gateway}/${toString net.prefixLen}" ];
+    address = ["${net.gateway}/${toString net.prefixLen}"];
     networkConfig = {
       ConfigureWithoutCarrier = true;
     };
@@ -27,9 +30,7 @@ let
       Kind = "bridge";
     };
   };
-
-in
-{
+in {
   imports = [
     ./firewall.nix
   ];
@@ -37,12 +38,14 @@ in
   # enable debug logging for network
   systemd.services."systemd-networkd".environment.SYSTEMD_LOG_LEVEL = "debug";
 
-  boot.kernel.sysctl = {
-    "net.ipv4.conf.all.forwarding" = true;
-    "net.ipv4.conf.all.rp_filter" = 0; # 0=off, 1=strict
-  } // (lib.optionalAttrs useIpv6 {
-    "net.ipv6.conf.all.forwarding" = true;
-  });
+  boot.kernel.sysctl =
+    {
+      "net.ipv4.conf.all.forwarding" = true;
+      "net.ipv4.conf.all.rp_filter" = 0; # 0=off, 1=strict
+    }
+    // (lib.optionalAttrs useIpv6 {
+      "net.ipv6.conf.all.forwarding" = true;
+    });
   boot.initrd.systemd.network.enable = false;
 
   # no resolved or resolvconf
@@ -74,54 +77,57 @@ in
     # if we do decide to use resolvconf, use systemd version not openresolv
     resolvconf.package = lib.mkForce pkgs.systemd;
 
-    timeServers = [
-      "0.us.pool.ntp.org"
-      "1.us.pool.ntp.org"
-      "2.us.pool.ntp.org"
-      "3.us.pool.ntp.org"
-    ];
+    timeServers = config.const.ntpServers.us;
   };
 
-  # use systemd-networkd, rather than the legacy systemd.network 
+  # use systemd-networkd, rather than the legacy systemd.network
   systemd.network.enable = true;
 
-  systemd.network.networks = {
-
-    "30-${iface1.localDev}" = {
-      enable = true;
-      name = iface1.localDev;
-      DHCP = if useIpv6 then "yes" else "ipv4";
-      matchConfig.Name = iface1.localDev;
-      dhcpV4Config = { };
-      networkConfig.IPv6AcceptRA = useIpv6;
-    };
-
-    "30-${iface2.localDev}" = {
-      enable = true;
-      name = iface2.localDev;
-      DHCP = if useIpv6 then "yes" else "ipv4";
-      matchConfig.Name = iface2.localDev;
-      dhcpV4Config = {
-        Hostname = "pangea2";
-        UseHostname = false; # don't set hostname from dhcp response
+  systemd.network.networks =
+    {
+      "30-${iface1.localDev}" = {
+        enable = true;
+        name = iface1.localDev;
+        DHCP =
+          if useIpv6
+          then "yes"
+          else "ipv4";
+        matchConfig.Name = iface1.localDev;
+        dhcpV4Config = {};
+        networkConfig.IPv6AcceptRA = useIpv6;
       };
-      networkConfig.IPv6AcceptRA = useIpv6;
-    };
-  }
-  // builtins.listToAttrs (
-    map
-      (subnet: { name = "50-${subnet.name}"; value = makeBridgeNet subnet; })
+
+      "30-${iface2.localDev}" = {
+        enable = true;
+        name = iface2.localDev;
+        DHCP =
+          if useIpv6
+          then "yes"
+          else "ipv4";
+        matchConfig.Name = iface2.localDev;
+        dhcpV4Config = {
+          Hostname = "pangea2";
+          UseHostname = false; # don't set hostname from dhcp response
+        };
+        networkConfig.IPv6AcceptRA = useIpv6;
+      };
+    }
+    // builtins.listToAttrs (
+      map
+      (subnet: {
+        name = "50-${subnet.name}";
+        value = makeBridgeNet subnet;
+      })
       config.my.managedNets
-  );
+    );
 
   systemd.network.links = {
-
     "10-${iface1.localDev}" = {
       enable = true;
       linkConfig.NamePolicy = "path";
       matchConfig = {
         Type = "ether";
-        MACAddress = [ iface1.macAddress ];
+        MACAddress = [iface1.macAddress];
       };
     };
 
@@ -132,122 +138,121 @@ in
       };
       matchConfig = {
         Type = "ether";
-        MACAddress = [ iface2.macAddress ];
+        MACAddress = [iface2.macAddress];
       };
     };
   };
 
   systemd.network.netdevs = builtins.listToAttrs (
     map
-      (subnet: { name = "20-${subnet.name}"; value = makeBridgeNetDev subnet; })
-      config.my.managedNets
+    (subnet: {
+      name = "20-${subnet.name}";
+      value = makeBridgeNetDev subnet;
+    })
+    config.my.managedNets
   );
 
-  services.kea =
-    let
-      keaCtrlCfg = config.my.services.kea.control-agent;
-      dhcp4Zone = snet: {
-        id = snet.dhcp.id;
-        interface = snet.name;
-        subnet = "${snet.gateway}/${toString snet.prefixLen}";
-        pools = [{ pool = snet.dhcp.pool; }];
-        reservations = snet.dhcp.reservations;
-        option-data = [
-          {
-            name = "domain-name";
-            data = snet.domain;
-          }
-          {
-            name = "domain-name-servers";
-            data = toCsv snet.dnsServers;
-          }
-          {
-            name = "domain-search";
-            data = snet.domain;
-          }
+  services.kea = let
+    keaCtrlCfg = config.my.services.kea.control-agent;
+    dhcp4Zone = snet: {
+      id = snet.dhcp.id;
+      interface = snet.name;
+      subnet = "${snet.gateway}/${toString snet.prefixLen}";
+      pools = [{pool = snet.dhcp.pool;}];
+      reservations = snet.dhcp.reservations;
+      option-data = [
+        {
+          name = "domain-name";
+          data = snet.domain;
+        }
+        {
+          name = "domain-name-servers";
+          data = toCsv snet.dnsServers;
+        }
+        {
+          name = "domain-search";
+          data = snet.domain;
+        }
 
-          {
-            name = "routers";
-            data = snet.gateway;
-          }
-          {
-            name = "ntp-servers";
-            # kea requires addresses, not dns names here
-            # ips below are obtained from {0-2}.pool.us.ntp.org on 10/18/2024
-            data = toCsv [
-              "104.194.8.227"
-              "142.202.190.19"
-              "144.34.193.110"
-              "155.248.196.28"
-              "172.233.153.85"
-            ];
-          }
-        ];
-        # DDNS is specific to this subnet (kea allows it to be set in global, shared-network, or subnet)
-        #ddns-qualifying-suffix = "${containerDomain}";
-        ddns-qualifying-suffix = snet.domain;
-        comment = "containers on ${snet.name}";
-      };
-    in
-    {
-      ctrl-agent.enable = keaCtrlCfg.enable;
-      ctrl-agent.settings = {
-        "http-port" = keaCtrlCfg.port;
-        "loggers" = [{
+        {
+          name = "routers";
+          data = snet.gateway;
+        }
+        {
+          name = "ntp-servers";
+          # kea requires addresses, not dns names here
+          # ips below are obtained from {0-2}.pool.us.ntp.org on 10/18/2024
+          data = toCsv [
+            "104.194.8.227"
+            "142.202.190.19"
+            "144.34.193.110"
+            "155.248.196.28"
+            "172.233.153.85"
+          ];
+        }
+      ];
+      # DDNS is specific to this subnet (kea allows it to be set in global, shared-network, or subnet)
+      #ddns-qualifying-suffix = "${containerDomain}";
+      ddns-qualifying-suffix = snet.domain;
+      comment = "containers on ${snet.name}";
+    };
+  in {
+    ctrl-agent.enable = keaCtrlCfg.enable;
+    ctrl-agent.settings = {
+      "http-port" = keaCtrlCfg.port;
+      "loggers" = [
+        {
           name = "kea-ctrl-agent";
           severity = "INFO";
-        }];
-      };
+        }
+      ];
+    };
 
-      dhcp-ddns = {
-        enable = true;
-        settings = {
-          ip-address = "127.0.0.1";
-          port = 53001;
-        };
-      };
-
-      dhcp4 = {
-        enable = true;
-        configFile = null;
-        settings = {
-          interfaces-config = {
-            interfaces = map (n: n.name) dhcpNets;
-          };
-          valid-lifetime = 86400; # leases valid for 1 day
-          renew-timer = 43200; # clients can renew after 12 hours
-          lease-database = {
-            type = "memfile";
-            persist = true;
-            name = "/var/lib/kea/dhcp4.leases";
-          };
-          loggers = [
-            {
-              name = "kea-dhcp4";
-              output_options = [
-                { output = "stdout"; }
-              ];
-              severity = "DEBUG";
-            }
-          ];
-          subnet4 = map dhcp4Zone dhcpNets;
-        };
+    dhcp-ddns = {
+      enable = true;
+      settings = {
+        ip-address = "127.0.0.1";
+        port = 53001;
       };
     };
 
-  services.tailscale =
-    let
-      cfg = config.my.services.tailscale;
-    in
-    {
-      enable = cfg.enable;
-      port = cfg.port;
-
-      # authKeyFile = "/run/secrets/tailscale_key";
-      extraUpFlags = [ ];
-      extraSetFlags = [ ];
-      extraDaemonFlags = [ ];
+    dhcp4 = {
+      enable = true;
+      configFile = null;
+      settings = {
+        interfaces-config = {
+          interfaces = map (n: n.name) dhcpNets;
+        };
+        valid-lifetime = 86400; # leases valid for 1 day
+        renew-timer = 43200; # clients can renew after 12 hours
+        lease-database = {
+          type = "memfile";
+          persist = true;
+          name = "/var/lib/kea/dhcp4.leases";
+        };
+        loggers = [
+          {
+            name = "kea-dhcp4";
+            output_options = [
+              {output = "stdout";}
+            ];
+            severity = "DEBUG";
+          }
+        ];
+        subnet4 = map dhcp4Zone dhcpNets;
+      };
     };
+  };
 
+  services.tailscale = let
+    cfg = config.my.services.tailscale;
+  in {
+    enable = cfg.enable;
+    port = cfg.port;
 
+    # authKeyFile = "/run/secrets/tailscale_key";
+    extraUpFlags = [];
+    extraSetFlags = [];
+    extraDaemonFlags = [];
+  };
 }
