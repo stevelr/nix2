@@ -7,6 +7,10 @@
   #  outputs,
   ...
 }: let
+  inherit (builtins) attrNames;
+  inherit (lib.attrsets) filterAttrs;
+  inherit (pkgs.myLib) tmpfiles;
+
   nginxIP = "10.55.0.15";
   mediaIP = "192.168.10.11";
   # where to forward incoming http traffic - either nginxIP or mediaIP
@@ -216,6 +220,18 @@ in {
         Kind = "bridge";
       };
     };
+
+    # For each normal user, give it its own sub-directories under /mnt/scratch/home/ and
+    # /var/tmp/home/.  This is especially useful for a user to place large dispensable things that
+    # it wants to be excluded from backups.
+    systemd.tmpfiles.packages =
+      tmpfiles.makeUserTmpdirPkgs
+      (attrNames (filterAttrs (n: v: v.isNormalUser) config.users.users))
+      "users"
+      [
+        "/var/tmp/home"
+        "/mnt/scratch/home"
+      ];
 
     # Set your time zone.
     time.timeZone = "America/Los_Angeles";

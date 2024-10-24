@@ -24,7 +24,13 @@
     home-manager = {
       url = "github:nix-community/home-manager";
       #url = "https://github.com/nix-community/home-manager/archive/release-24.05.tar.gz";
-      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.nixpkgs.follows = "nixpkgs-unstable";
+    };
+
+    # disko
+    disko = {
+      url = "github:nix-community/disko/latest";
+      inputs.nixpkgs.follows = "nixpkgs-unstable";
     };
   };
 
@@ -35,6 +41,7 @@
     nix-darwin,
     flake-checker,
     home-manager,
+    disko,
     ...
   } @ inputs: let
     inherit (self) outputs;
@@ -140,7 +147,8 @@
 
       # template for minimal system
       minimal = mkSystem {
-        system = "x86_64-linux";
+        #system = "x86_64-linux";
+        system = "aarch64-linux";
         modules =
           [
             ./per-host/minimal

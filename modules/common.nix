@@ -7,6 +7,7 @@
       file
       fzf
       git
+      gnugrep
       gnupg
       gnused
       helix
@@ -14,6 +15,7 @@
       jq
       just
       less
+      lsof
       netcat
       openssh
       openssl
@@ -22,6 +24,7 @@
       ripgrep
       rsync
       unzip
+      util-linux
       vim
       wget
       xz
@@ -32,5 +35,8 @@
       EDITOR = "${pkgs.vim}/bin/vim";
       PAGER = "${pkgs.less}/bin/less";
     };
+
+    programs.bash.enable = true;
+    programs.zsh.enable = true;
   };
 }
